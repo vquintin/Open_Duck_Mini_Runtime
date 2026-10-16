@@ -9,7 +9,9 @@ import pygame
 from mini_bdx_runtime.buttons import Buttons
 
 X_RANGE = [-0.15, 0.15]
-Y_RANGE = [-0.2, 0.2]
+# Sideways slower than forward: no policy ever stepped sideways faster than
+# ~0.13 m/s, and training now draws +-0.1 (Open_Duck_Playground run14).
+Y_RANGE = [-0.1, 0.1]
 YAW_RANGE = [-1.0, 1.0]
 
 # rads

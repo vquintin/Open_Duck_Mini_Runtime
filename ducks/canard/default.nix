@@ -23,12 +23,14 @@
   ];
 
   services.open-duck.walk = {
-    # Trained for canard (Open_Duck_Playground branch canard, 87b66ff +
-    # 845664c): its measured mass, floor friction down to tiles', 302M steps
-    # of flat_terrain_backlash. In sim it tracks yaw rate (0.63 for 0.65,
-    # ~1.0 for 1.0) where BEST_WALK_ONNX_2 (pkgs.open-duck-models.best-walk-2,
-    # the module's default) turned 65-85% of it.
-    onnxModelPath = ./canard_walk_1.onnx;
+    # Trained for canard (Open_Duck_Playground branch canard, 54231e4, run22
+    # at 38M): its measured mass, the real soles, hills, pebbles and steps,
+    # a left-right symmetric reference gait and symmetry augmentation. On
+    # the home pose of init_pos (made its own mirror image), which it needs.
+    # In sim: forward 0.12 for 0.15, turning ~1.0 for 1.0 both ways,
+    # sideways 0.094 / 0.091 for 0.1 left / right. canard_walk_1.onnx, its
+    # first policy (flat floors only), stepped sideways one way only.
+    onnxModelPath = ./canard_walk_2.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

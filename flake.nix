@@ -216,7 +216,9 @@
             } ''
             if [ -d ${self}/tests ]; then
               cp -r ${self}/tests tests
-              chmod -R u+w tests
+              # tests of the scripts' pure helpers import them from ../scripts
+              cp -r ${self}/scripts scripts
+              chmod -R u+w tests scripts
               python -m pytest -q -p no:cacheprovider tests
             else
               echo "No ./tests directory; nothing to run."

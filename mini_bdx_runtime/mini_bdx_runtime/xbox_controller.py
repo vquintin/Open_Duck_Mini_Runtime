@@ -36,10 +36,20 @@ LAYOUTS: dict[str, dict[str, dict[str, int]]] = {
 
 # Trigger readings below this are treated as fully released.
 TRIGGER_DEADZONE = 0.1
+# Stick readings below this are treated as centred: canard's right stick rests
+# at 0.03-0.04, which the policy takes for a slow turn and steps to. The range
+# past it is rescaled, so a full push is still 1.
+STICK_DEADZONE = 0.08
 # Decimal places commands and triggers are rounded to.
 ROUND_DECIMALS = 3
 # The worker only keeps the most recent command.
 CMD_QUEUE_SIZE = 1
+
+
+def stick(v: float) -> float:
+    if abs(v) <= STICK_DEADZONE:
+        return 0.0
+    return float(np.sign(v)) * (abs(v) - STICK_DEADZONE) / (1 - STICK_DEADZONE)
 
 
 def detect_layout(joystick_name: str) -> str:
@@ -153,9 +163,9 @@ class XBoxController:
         axes = self.layout["axes"]
         buttons = self.layout["buttons"]
 
-        l_x = -1 * self.p1.get_axis(axes["lx"])
-        l_y = -1 * self.p1.get_axis(axes["ly"])
-        r_x = -1 * self.p1.get_axis(axes["rx"])
+        l_x = -stick(self.p1.get_axis(axes["lx"]))
+        l_y = -stick(self.p1.get_axis(axes["ly"]))
+        r_x = -stick(self.p1.get_axis(axes["rx"]))
 
         right_trigger = np.around((self.p1.get_axis(axes["rt"]) + 1) / 2, ROUND_DECIMALS)
         left_trigger = np.around((self.p1.get_axis(axes["lt"]) + 1) / 2, ROUND_DECIMALS)

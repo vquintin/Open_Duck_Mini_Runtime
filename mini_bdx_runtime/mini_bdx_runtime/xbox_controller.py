@@ -40,6 +40,9 @@ TRIGGER_DEADZONE = 0.1
 # at 0.03-0.04, which the policy takes for a slow turn and steps to. The range
 # past it is rescaled, so a full push is still 1.
 STICK_DEADZONE = 0.08
+# Walk commands (vx, vy m/s, yaw rad/s) below these are zero, as in training
+# (Open_Duck_Playground e56235b): the policy never saw a smaller one.
+COMMAND_DEADZONE = (0.02, 0.02, 0.1)
 # Decimal places commands and triggers are rounded to.
 ROUND_DECIMALS = 3
 # The worker only keeps the most recent command.
@@ -50,6 +53,15 @@ def stick(v: float) -> float:
     if abs(v) <= STICK_DEADZONE:
         return 0.0
     return float(np.sign(v)) * (abs(v) - STICK_DEADZONE) / (1 - STICK_DEADZONE)
+
+
+def walk_command(l_y: float, l_x: float, r_x: float) -> tuple[float, float, float]:
+    """Sticks (deadzoned, -1..1) to (vx, vy, yaw rate)."""
+    cmd = []
+    for v, (lo, hi), dz in zip((l_y, l_x, r_x), (X_RANGE, Y_RANGE, YAW_RANGE), COMMAND_DEADZONE):
+        v = v * (abs(hi) if v >= 0 else abs(lo))
+        cmd.append(0.0 if abs(v) < dz else v)
+    return tuple(cmd)
 
 
 def detect_layout(joystick_name: str) -> str:
@@ -176,27 +188,7 @@ class XBoxController:
             right_trigger = 0
 
         if not self.head_control_mode:
-            lin_vel_y = l_x
-            lin_vel_x = l_y
-            ang_vel = r_x
-            if lin_vel_x >= 0:
-                lin_vel_x *= np.abs(X_RANGE[1])
-            else:
-                lin_vel_x *= np.abs(X_RANGE[0])
-
-            if lin_vel_y >= 0:
-                lin_vel_y *= np.abs(Y_RANGE[1])
-            else:
-                lin_vel_y *= np.abs(Y_RANGE[0])
-
-            if ang_vel >= 0:
-                ang_vel *= np.abs(YAW_RANGE[1])
-            else:
-                ang_vel *= np.abs(YAW_RANGE[0])
-
-            last_commands[0] = lin_vel_x
-            last_commands[1] = lin_vel_y
-            last_commands[2] = ang_vel
+            last_commands[0:3] = walk_command(l_y, l_x, r_x)
         else:
             last_commands[0] = 0.0
             last_commands[1] = 0.0

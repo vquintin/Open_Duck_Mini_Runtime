@@ -23,16 +23,17 @@
   ];
 
   services.open-duck.walk = {
-    # Trained for canard (Open_Duck_Playground branch canard, b352d8e, run23
-    # at 41M, from run22 at 38M = canard_walk_2.onnx): its measured mass,
-    # the real soles, hills, pebbles and steps, a left-right symmetric
-    # reference gait and symmetry augmentation, on the home pose of init_pos
-    # (made its own mirror image), which it needs. Over canard_walk_2: the
-    # joint angle noise on both legs (the right one read noiseless), and
-    # each joint's backlash drawn from +-0.25 to 1.0 deg (canard's hip yaws:
-    # 0.6 and 1.5 deg). In sim: forward 0.13 for 0.15, turning ~1.05 for
-    # 1.0 both ways, sideways 0.097 / 0.093 for 0.1 left / right.
-    onnxModelPath = ./canard_walk_3.onnx;
+    # Trained for canard (Open_Duck_Playground branch canard, 1d70cc3+e7acf39,
+    # run24 at 41M, from run23 at 41M = canard_walk_3.onnx): the real soles,
+    # hills, pebbles and steps, a left-right symmetric reference gait and
+    # symmetry augmentation, on the home pose of init_pos (made its own mirror
+    # image), which it needs; the joint noise on both legs, each joint's
+    # backlash per episode. Over canard_walk_3: canard's weighed masses, 2605 g,
+    # legs 508 g each (the CAD's 413.5), the trunk's center of mass from its
+    # weighed parts, but its head at 454 g for the 545 weighed (a typo; run25
+    # trains on 545). In sim: forward 0.128 for 0.15, turning ~1.05 for 1.0
+    # both ways, sideways 0.103 / 0.099 for 0.1 left / right.
+    onnxModelPath = ./canard_walk_4.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

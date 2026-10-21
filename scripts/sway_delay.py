@@ -1,4 +1,4 @@
-"""Sway a standing duck back and forth with its ankles, no policy, and record
+"""Sway a standing duck back and forth with its ankles (or its neck: --joints), no policy, and record
 when the encoders and the IMU see it: the loop's delays without the policy
 closing the loop.
 
@@ -11,7 +11,8 @@ records the goals sent, the positions read back, the IMU sample used and when
 each happened (see mini_bdx_runtime.telemetry).
 
 Goal -> encoder gives the servos' response, encoder -> gyro the IMU's delay
-(feet flat, the trunk pitches with the ankles).
+(feet flat, the trunk pitches with the ankles). Swaying the neck on held legs
+shakes the trunk on its soles instead, with no joint of the legs moving.
 """
 
 import argparse
@@ -59,6 +60,15 @@ def sway(t: float, amplitude: float = 1.0) -> tuple[int, float]:
     return RETURN, 0.0
 
 
+def moved_joints(names: str, joints: list[str]) -> list[str]:
+    """The comma-separated joints to sway, each one of the duck's."""
+    moved = [n.strip() for n in names.split(",") if n.strip()]
+    unknown = [n for n in moved if n not in joints]
+    if not moved or unknown:
+        raise ValueError(f"unknown joints {unknown}; choose among {joints}")
+    return moved
+
+
 def main() -> None:
     from excite_servos import walk_is_running, walk_service_args
     from mini_bdx_runtime.duck_config import DuckConfig
@@ -71,7 +81,11 @@ def main() -> None:
     parser.add_argument("--duck_config_path", default=service.get("duck_config_path"))
     parser.add_argument("--serial_port", default=service.get("serial_port", "/dev/ttyACM0"))
     parser.add_argument("--output_dir", default=os.path.expanduser("~/telemetry"))
-    parser.add_argument("--amplitude", type=float, default=1.0, help="scales the ankle motion")
+    parser.add_argument("--joints", default=",".join(ANKLES),
+                        help="the joints swayed together, e.g. neck_pitch to shake the trunk on stiff legs")
+    parser.add_argument("--amplitude", type=float, default=1.0, help="scales the motion")
+    parser.add_argument("--leg_kp", type=int, default=LEG_KP)
+    parser.add_argument("--head_kp", type=int, default=HEAD_KP)
     parser.add_argument("--imu_hz", type=int, default=CONTROL_HZ,
                         help="IMU thread rate (the walk samples it at its control rate)")
     parser.add_argument("--repeats", type=int, default=2)
@@ -83,14 +97,15 @@ def main() -> None:
     duck_config = DuckConfig(config_json_path=args.duck_config_path) if args.duck_config_path else DuckConfig()
     hwi = HWI(duck_config, args.serial_port)
     joints = list(hwi.joints.keys())
-    ankles = [joints.index(a) for a in ANKLES]
+    moved = moved_joints(args.joints, joints)
+    swayed = [joints.index(a) for a in moved]
 
-    print(f"Swaying the ankles by up to {0.04 * args.amplitude:.3f} rad, "
+    print(f"Swaying {', '.join(moved)} by up to {max(abs(s) for s in STEPS) * args.amplitude:.3f} rad, "
           f"{args.repeats} x {RUN_S:.0f} s. Hold a hand near it.")
     if not args.yes and input("Is the duck standing on its feet? [y/N] ").lower() != "y":
         sys.exit("Aborted.")
 
-    hwi.set_kps([HEAD_KP if j in HEAD_JOINTS else LEG_KP for j in joints])
+    hwi.set_kps([args.head_kp if j in HEAD_JOINTS else args.leg_kp for j in joints])
     hwi.turn_on()
     imu = Imu(sampling_freq=args.imu_hz, orientation=duck_config.imu_orientation,
               calibration=duck_config.imu_calib)
@@ -101,7 +116,7 @@ def main() -> None:
         [
             ("t", "f8", ()),  # loop start
             ("segment", "u1", ()),  # 0 settle, 1 step, 2 chirp, 3 return
-            ("offset", "f4", ()),  # rad, ankle offset sent
+            ("offset", "f4", ()),  # rad, offset sent to the swayed joints
             ("goal", "f4", (14,)),  # rad, without the joints' offsets
             ("t_write", "f8", ()),  # goals written
             ("pos", "f4", (14,)),  # rad, present positions, without the offsets
@@ -110,7 +125,7 @@ def main() -> None:
             ("accelero", "f4", (3,)),
             ("imu_t", "f8", ()),  # when that sample was read from the BNO055
         ],
-        {"kind": "sway", "joints": joints, "ankles": list(ANKLES), "init_pos": [hwi.init_pos[j] for j in joints],
+        {"kind": "sway", "joints": joints, "moved": moved, "leg_kp": args.leg_kp, "head_kp": args.head_kp, "init_pos": [hwi.init_pos[j] for j in joints],
          "amplitude": args.amplitude, "steps": STEPS, "step_hold_s": STEP_HOLD_S,
          "chirp": {"amplitude": CHIRP_AMPLITUDE, "f0": CHIRP_F0, "f1": CHIRP_F1, "s": CHIRP_S},
          "settle_s": SETTLE_S, "return_s": RETURN_S, "control_hz": CONTROL_HZ, "imu_hz": args.imu_hz,
@@ -126,7 +141,7 @@ def main() -> None:
                 segment, offset = sway(now - start, args.amplitude)
                 sample = imu.get_data()
                 goal = init.copy()
-                goal[ankles] += offset
+                goal[swayed] += offset
                 hwi.set_position_all(dict(zip(joints, goal)))
                 t_write = time.time()
                 pos = hwi.get_present_positions()

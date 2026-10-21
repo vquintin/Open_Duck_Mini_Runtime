@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from sway_delay import RUN_S, SETTLE_S, STEPS, sway  # noqa: E402
+from sway_delay import RUN_S, SETTLE_S, STEPS, moved_joints, sway  # noqa: E402
 
 
 def offsets(amplitude=1.0, dt=0.02):
@@ -32,3 +32,13 @@ def test_the_sweep_has_no_jump():
 def test_steps_are_held():
     assert sway(SETTLE_S + 0.5) == (1, pytest.approx(STEPS[0]))
     assert sway(SETTLE_S + 2.5)[1] == pytest.approx(STEPS[2])
+
+
+def test_the_swayed_joints_are_the_ducks():
+    joints = ["left_ankle", "neck_pitch", "right_ankle"]
+    assert moved_joints("neck_pitch", joints) == ["neck_pitch"]
+    assert moved_joints("left_ankle, right_ankle", joints) == ["left_ankle", "right_ankle"]
+    with pytest.raises(ValueError):
+        moved_joints("neck", joints)
+    with pytest.raises(ValueError):
+        moved_joints("", joints)

@@ -27,12 +27,12 @@ let
   # the two architectures we actually target are wired up.
   rustypotWheels = {
     "x86_64-linux" = {
-      url = "https://files.pythonhosted.org/packages/8c/d9/9254cb8a42b33e46c24dd49bbadeb4d437650cf3384843e116f2dd58818c/rustypot-0.1.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl";
-      hash = "sha256-t+8bZS5sb1cBq43BYAYToXPbZ5rzR7P/uSEhRXj7nS0=";
+      url = "https://files.pythonhosted.org/packages/b4/9d/4810ffd92b89fff48860af14bcc3d2239fe0211a4a8325168175dcd28105/rustypot-1.13.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl";
+      hash = "sha256-mPhQL5avnhA0ieMYhOM0ihp7S1Z09jgzhvB21FqXPr4=";
     };
     "aarch64-linux" = {
-      url = "https://files.pythonhosted.org/packages/7c/fb/d220718c49a28fa8b92c97bf3eb04656d6f4ada0ef050030cb28effb39f1/rustypot-0.1.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl";
-      hash = "sha256-lH7RzPh/CReY2AOpkTAYWqLIQaPlq+A5zXzRFIeQkww=";
+      url = "https://files.pythonhosted.org/packages/e0/87/780735f89cd17a24f492fcbf5674ed0e1547934bc6f0b3576f16ffdd0d93/rustypot-1.13.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl";
+      hash = "sha256-UDXKn2StAHZk9jgCbj1L1WUfZ3z23YgD6XEf+D+vZ7I=";
     };
   };
 
@@ -67,7 +67,9 @@ in
 {
   rustypot = pyfinal.buildPythonPackage rec {
     pname = "rustypot";
-    version = "0.1.0";
+    # 1.x: the Sts3215 controller reads temperature, voltage, load, current
+    # and status, and its torque disable works (0.1.0's left the torque on).
+    version = "1.13.1";
     format = "wheel";
     src = fetchurl (rustypotWheels.${system} or (throw
       "rustypot: no prebuilt wheel wired up for system ${system}"));

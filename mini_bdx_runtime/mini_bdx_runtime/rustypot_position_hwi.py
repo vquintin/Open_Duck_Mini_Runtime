@@ -5,9 +5,12 @@ import numpy as np
 import rustypot
 
 from mini_bdx_runtime.duck_config import DuckConfig
+from mini_bdx_runtime.feetech_bus import FeetechBus, ServoHealth
 
 # Feetech STS3215 serial bus baud rate.
 FEETECH_BAUDRATE = 1_000_000
+# s a servo that doesn't answer may hold the bus (a sync read takes ~2 ms).
+SERIAL_TIMEOUT_S = 0.05
 # Default position-control gains applied to every joint.
 DEFAULT_KP = 32
 DEFAULT_KD = 0
@@ -94,7 +97,7 @@ class HWI:
         self.kds = np.ones(len(self.joints)) * DEFAULT_KD
         self.low_torque_kps = np.ones(len(self.joints)) * LOW_TORQUE_KP
 
-        self.io = rustypot.feetech(usb_port, FEETECH_BAUDRATE)
+        self.io = FeetechBus(rustypot.Sts3215PyController(usb_port, FEETECH_BAUDRATE, SERIAL_TIMEOUT_S))
 
     def set_kps(self, kps) -> None:
         self.kps = kps
@@ -117,6 +120,8 @@ class HWI:
         # nothing jumps toward a stale goal position.
         self.set_position_all(dict(zip(joint_names, start)))
         self.io.set_kps(list(self.joints.values()), self.low_torque_kps)
+        # rustypot 1.x leaves a disabled torque off (0.1.0's goal writes turned it back on)
+        self.io.enable_torque(list(self.joints.values()))
         print("turn on : low KPS set")
 
         steps = int(TURN_ON_RAMP_S * TURN_ON_RAMP_HZ)
@@ -131,6 +136,10 @@ class HWI:
 
     def turn_off(self) -> None:
         self.io.disable_torque(list(self.joints.values()))
+
+    def get_health(self) -> ServoHealth:
+        """Each joint's servo temperature, voltage and error bits, in self.joints' order."""
+        return self.io.read_health(list(self.joints.values()))
 
     def set_position(self, joint_name: str, pos: float) -> None:
         """

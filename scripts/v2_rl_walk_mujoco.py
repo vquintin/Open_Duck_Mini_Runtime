@@ -18,6 +18,7 @@ from mini_bdx_runtime.poly_reference_motion import PolyReferenceMotion
 from mini_bdx_runtime.projector import Projector
 from mini_bdx_runtime.raw_imu import Imu
 from mini_bdx_runtime.rl_utils import LowPassActionFilter, make_action_dict
+from mini_bdx_runtime.feetech_bus import HealthPoller
 from mini_bdx_runtime.rustypot_position_hwi import HWI
 from mini_bdx_runtime.sounds import Sounds
 from mini_bdx_runtime.telemetry import TelemetryWriter
@@ -47,6 +48,11 @@ OBS_LAYOUT = [
 OBS_SIZE = sum(size for _, size in OBS_LAYOUT)
 # Scale applied to joint velocities in the observation vector.
 DOF_VEL_OBS_SCALE = 0.05
+# Servo temperature, voltage and error bits are read one per step, each about
+# once a second (feetech_bus.HealthPoller); a servo this hot gets a warning
+# (the STS3215 drops its torque at 70: canard's right knee did, 2026-10-21).
+HEALTH_POLL_STEPS = 50
+SERVO_HOT_C = 60
 
 # Control defaults.
 DEFAULT_PID = (30, 0, 0)
@@ -101,6 +107,8 @@ class RLWalk:
         max_motor_velocity: float = DEFAULT_MAX_MOTOR_VELOCITY,
         telemetry_dir: str | None = None,
         zero_gyro_yaw: bool = False,
+        imu_mode: str = "ndof",
+        gyro_bandwidth: float | None = None,
     ) -> None:
         self.duck_config = DuckConfig(config_json_path=duck_config_path)
 
@@ -117,6 +125,8 @@ class RLWalk:
         # torso's yaw wobble is fed by the policy's own reaction to it.
         self.zero_gyro_yaw = zero_gyro_yaw
         self.last_gyro = np.zeros(3)  # as measured, for telemetry
+        self.imu_mode = imu_mode
+        self.gyro_bandwidth = gyro_bandwidth
 
         # Control
         self.control_freq = control_freq
@@ -138,6 +148,8 @@ class RLWalk:
             )
 
         self.hwi = HWI(self.duck_config, serial_port)
+        self.health = HealthPoller(self.hwi.io, list(self.hwi.joints.values()), every=HEALTH_POLL_STEPS)
+        self.hot_servos: set[str] = set()
 
         self.start()
 
@@ -145,6 +157,8 @@ class RLWalk:
             sampling_freq=int(self.control_freq),
             orientation=self.duck_config.imu_orientation,
             calibration = self.duck_config.imu_calib,
+            mode=self.imu_mode,
+            gyro_bandwidth_hz=self.gyro_bandwidth,
         )
 
         self.feet_contacts = FeetContacts()
@@ -298,6 +312,30 @@ class RLWalk:
         self.imu.rejected_samples = 0
         self.reset_stats()
 
+    def poll_health(self) -> None:
+        """One of the servos' health registers a step; warn once when one runs hot."""
+        try:
+            self.health.step()
+        except Exception as e:
+            print("[servos]: health read failed:", e)
+            return
+        h = self.health.health
+        if h is None:
+            return
+        for joint, temp in zip(self.hwi.joints, h.temperature):
+            if temp >= SERVO_HOT_C and joint not in self.hot_servos:
+                self.hot_servos.add(joint)
+                print(f"[servos]: {joint} at {temp} C")
+            elif temp < SERVO_HOT_C - 5:
+                self.hot_servos.discard(joint)
+
+    def health_telemetry(self) -> dict:
+        h = self.health.health
+        if h is None:
+            zeros = np.zeros(self.num_dofs)
+            return {"servo_temp": zeros, "servo_voltage": zeros, "servo_status": zeros}
+        return {"servo_temp": h.temperature, "servo_voltage": h.voltage, "servo_status": h.status}
+
     def open_telemetry(self) -> None:
         """Start this walk's recording; tools/sim replay read it back."""
         assert self.telemetry_dir is not None
@@ -316,6 +354,9 @@ class RLWalk:
                 ("took", "f4", ()),  # s spent in the step before sleeping
                 ("marker", "u1", ()),  # RB pressed: something worth a look
                 ("gyro", "f4", (3,)),  # rad/s as measured (obs may hide the yaw)
+                ("servo_temp", "u1", (self.num_dofs,)),  # deg C, last read (0: not yet)
+                ("servo_voltage", "f4", (self.num_dofs,)),  # V, last read
+                ("servo_status", "u1", (self.num_dofs,)),  # error bits, last read
             ],
             {
                 "kind": "walk",
@@ -330,6 +371,8 @@ class RLWalk:
                 "max_target_offset": self.max_target_offset,
                 "obs_layout": OBS_LAYOUT,
                 "zero_gyro_yaw": self.zero_gyro_yaw,
+                "imu_mode": self.imu_mode,
+                "gyro_bandwidth": self.gyro_bandwidth,
             },
         )
         print(f"TELEMETRY {base}.bin")
@@ -500,6 +543,7 @@ class RLWalk:
                 )
 
                 self.hwi.set_position_all(action_dict)
+                self.poll_health()
 
                 i += 1
                 self.stats_steps += 1
@@ -517,6 +561,7 @@ class RLWalk:
                         took=took,
                         marker=mark_next_step,
                         gyro=self.last_gyro,
+                        **self.health_telemetry(),
                     )
                     mark_next_step = False
                 if (1 / self.control_freq - took) < 0:
@@ -614,6 +659,14 @@ if __name__ == "__main__":
         help="diagnostic: give the policy a yaw rate of 0 (telemetry keeps the measured one)",
     )
 
+    parser.add_argument(
+        "--imu_mode",
+        choices=("ndof", "amg"),
+        default="ndof",
+        help="the BNO055's: fused, or raw (~30 ms fresher gyro) with --gyro_bandwidth",
+    )
+    parser.add_argument("--gyro_bandwidth", type=float, default=None, help="Hz, raw mode only")
+
     args = parser.parse_args()
     pid = [args.p, args.i, args.d]
 
@@ -634,6 +687,8 @@ if __name__ == "__main__":
         max_motor_velocity=args.max_motor_velocity,
         telemetry_dir=args.telemetry_dir,
         zero_gyro_yaw=args.zero_gyro_yaw,
+        imu_mode=args.imu_mode,
+        gyro_bandwidth=args.gyro_bandwidth,
     )
     print("Done instantiating RLWalk")
     rl_walk.run()

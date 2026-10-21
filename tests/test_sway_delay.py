@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from sway_delay import RUN_S, SETTLE_S, STEPS, moved_joints, sway  # noqa: E402
+from sway_delay import RUN_S, SETTLE_S, STEPS, joint_signs, moved_joints, sway  # noqa: E402
 
 
 def offsets(amplitude=1.0, dt=0.02):
@@ -42,3 +42,12 @@ def test_the_swayed_joints_are_the_ducks():
         moved_joints("neck", joints)
     with pytest.raises(ValueError):
         moved_joints("", joints)
+
+
+def test_a_minus_sways_a_joint_the_other_way():
+    # the hips' pitch axes point opposite ways: the same sway, opposite goals
+    joints = ["left_hip_pitch", "right_hip_pitch"]
+    assert joint_signs("left_hip_pitch,-right_hip_pitch", joints) == [1.0, -1.0]
+    assert moved_joints("left_hip_pitch,-right_hip_pitch", joints) == joints
+    with pytest.raises(ValueError):
+        moved_joints("-hip", joints)

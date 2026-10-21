@@ -60,13 +60,25 @@ def sway(t: float, amplitude: float = 1.0) -> tuple[int, float]:
     return RETURN, 0.0
 
 
+def _named(names: str) -> list[str]:
+    return [n.strip() for n in names.split(",") if n.strip()]
+
+
 def moved_joints(names: str, joints: list[str]) -> list[str]:
-    """The comma-separated joints to sway, each one of the duck's."""
-    moved = [n.strip() for n in names.split(",") if n.strip()]
+    """The comma-separated joints to sway, each one of the duck's; a leading
+    minus sways it the other way."""
+    moved = [n.removeprefix("-") for n in _named(names)]
     unknown = [n for n in moved if n not in joints]
     if not moved or unknown:
         raise ValueError(f"unknown joints {unknown}; choose among {joints}")
     return moved
+
+
+def joint_signs(names: str, joints: list[str]) -> list[float]:
+    """Each swayed joint's sign: -1 for a leading minus (the right hip's pitch,
+    its axis the left's opposite)."""
+    moved_joints(names, joints)
+    return [-1.0 if n.startswith("-") else 1.0 for n in _named(names)]
 
 
 def main() -> None:
@@ -82,7 +94,8 @@ def main() -> None:
     parser.add_argument("--serial_port", default=service.get("serial_port", "/dev/ttyACM0"))
     parser.add_argument("--output_dir", default=os.path.expanduser("~/telemetry"))
     parser.add_argument("--joints", default=",".join(ANKLES),
-                        help="the joints swayed together, e.g. neck_pitch to shake the trunk on stiff legs")
+                        help="the joints swayed together, e.g. neck_pitch to shake the trunk on stiff legs; "
+                             "-name sways one the other way (left_hip_pitch,-right_hip_pitch)")
     parser.add_argument("--amplitude", type=float, default=1.0, help="scales the motion")
     parser.add_argument("--leg_kp", type=int, default=LEG_KP)
     parser.add_argument("--head_kp", type=int, default=HEAD_KP)
@@ -99,6 +112,7 @@ def main() -> None:
     joints = list(hwi.joints.keys())
     moved = moved_joints(args.joints, joints)
     swayed = [joints.index(a) for a in moved]
+    signs = np.array(joint_signs(args.joints, joints))
 
     print(f"Swaying {', '.join(moved)} by up to {max(abs(s) for s in STEPS) * args.amplitude:.3f} rad, "
           f"{args.repeats} x {RUN_S:.0f} s. Hold a hand near it.")
@@ -125,7 +139,7 @@ def main() -> None:
             ("accelero", "f4", (3,)),
             ("imu_t", "f8", ()),  # when that sample was read from the BNO055
         ],
-        {"kind": "sway", "joints": joints, "moved": moved, "leg_kp": args.leg_kp, "head_kp": args.head_kp, "init_pos": [hwi.init_pos[j] for j in joints],
+        {"kind": "sway", "joints": joints, "moved": moved, "signs": signs.tolist(), "leg_kp": args.leg_kp, "head_kp": args.head_kp, "init_pos": [hwi.init_pos[j] for j in joints],
          "amplitude": args.amplitude, "steps": STEPS, "step_hold_s": STEP_HOLD_S,
          "chirp": {"amplitude": CHIRP_AMPLITUDE, "f0": CHIRP_F0, "f1": CHIRP_F1, "s": CHIRP_S},
          "settle_s": SETTLE_S, "return_s": RETURN_S, "control_hz": CONTROL_HZ, "imu_hz": args.imu_hz,
@@ -141,7 +155,7 @@ def main() -> None:
                 segment, offset = sway(now - start, args.amplitude)
                 sample = imu.get_data()
                 goal = init.copy()
-                goal[swayed] += offset
+                goal[swayed] += signs * offset
                 hwi.set_position_all(dict(zip(joints, goal)))
                 t_write = time.time()
                 pos = hwi.get_present_positions()

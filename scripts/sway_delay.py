@@ -101,6 +101,9 @@ def main() -> None:
     parser.add_argument("--head_kp", type=int, default=HEAD_KP)
     parser.add_argument("--imu_hz", type=int, default=CONTROL_HZ,
                         help="IMU thread rate (the walk samples it at its control rate)")
+    parser.add_argument("--imu_mode", choices=("ndof", "amg"), default="ndof",
+                        help="the BNO055's: fused (the walk's) or raw, with --gyro_bandwidth")
+    parser.add_argument("--gyro_bandwidth", type=float, help="Hz, raw mode only (see imu_modes.py)")
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--yes", action="store_true", help="don't ask whether it stands")
     args = parser.parse_args()
@@ -122,7 +125,7 @@ def main() -> None:
     hwi.set_kps([args.head_kp if j in HEAD_JOINTS else args.leg_kp for j in joints])
     hwi.turn_on()
     imu = Imu(sampling_freq=args.imu_hz, orientation=duck_config.imu_orientation,
-              calibration=duck_config.imu_calib)
+              calibration=duck_config.imu_calib, mode=args.imu_mode, gyro_bandwidth_hz=args.gyro_bandwidth)
 
     base = os.path.join(args.output_dir, f"sway_{time.strftime('%Y%m%d_%H%M%S')}")
     rec = TelemetryWriter(
@@ -142,7 +145,7 @@ def main() -> None:
         {"kind": "sway", "joints": joints, "moved": moved, "signs": signs.tolist(), "leg_kp": args.leg_kp, "head_kp": args.head_kp, "init_pos": [hwi.init_pos[j] for j in joints],
          "amplitude": args.amplitude, "steps": STEPS, "step_hold_s": STEP_HOLD_S,
          "chirp": {"amplitude": CHIRP_AMPLITUDE, "f0": CHIRP_F0, "f1": CHIRP_F1, "s": CHIRP_S},
-         "settle_s": SETTLE_S, "return_s": RETURN_S, "control_hz": CONTROL_HZ, "imu_hz": args.imu_hz,
+         "settle_s": SETTLE_S, "return_s": RETURN_S, "control_hz": CONTROL_HZ, "imu_hz": args.imu_hz, "imu_mode": args.imu_mode, "gyro_bandwidth": args.gyro_bandwidth,
          "repeats": args.repeats},
     )
     print(f"Recording to {base}.bin")

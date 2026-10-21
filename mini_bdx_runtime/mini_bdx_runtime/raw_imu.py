@@ -11,6 +11,8 @@ import board
 import busio
 import numpy as np
 
+from mini_bdx_runtime.imu_modes import NDOF_MODE, imu_settings
+
 # The sensor reports in its own axes; the walk rotates its readings into the
 # robot's with the configured orientation (see imu_orientation.py). The chip
 # keeps its remap registers across a Pi reboot, so set them back to the
@@ -64,11 +66,11 @@ class ImuCalibration:
     magnetometer: tuple[int, int, int]
 
 
-def _init_bno055() -> adafruit_bno055.BNO055_I2C:
-    """Create the BNO055 over I2C in NDOF mode, in the sensor's own axes."""
+def _init_bno055(mode: int = NDOF_MODE) -> adafruit_bno055.BNO055_I2C:
+    """Create the BNO055 over I2C in the given mode, in the sensor's own axes."""
     i2c = busio.I2C(board.SCL, board.SDA)
     imu = adafruit_bno055.BNO055_I2C(i2c)
-    imu.mode = adafruit_bno055.NDOF_MODE
+    imu.mode = mode
     imu.axis_remap = AXIS_REMAP_NONE
     return imu
 
@@ -99,14 +101,23 @@ class Imu:
         sampling_freq: int,
         calibration: ImuCalibration | None = None,
         orientation: np.ndarray | None = None,
+        mode: str = "ndof",
+        gyro_bandwidth_hz: float | None = None,
+        accel_bandwidth_hz: float | None = None,
     ) -> None:
         """orientation: the IMU's in the robot frame (v_robot = orientation @
-        v_imu, see imu_orientation.py); None reports the sensor's own axes."""
+        v_imu, see imu_orientation.py); None reports the sensor's own axes.
+        mode: "ndof" (fused, the sensor's filters) or "amg" (raw, with these
+        bandwidths; see imu_modes.py)."""
+        self.mode, self.gyro_bandwidth, self.accel_bandwidth = imu_settings(
+            mode, gyro_bandwidth_hz, accel_bandwidth_hz
+        )
         self.sampling_freq = sampling_freq
         self.orientation = np.eye(3) if orientation is None else np.asarray(orientation)
         self.calibration = calibration
-        self.imu = _init_bno055()
+        self.imu = _init_bno055(self.mode)
         self.apply_calibration()
+        self.apply_bandwidths()
 
         # Spikes dropped since the walk last looked; it resets the count.
         self.rejected_samples = 0
@@ -133,13 +144,23 @@ class Imu:
             self.imu.offsets_gyroscope = self.calibration.gyroscope
             print(f"magnetometer calibration: {self.calibration.magnetometer}")
             self.imu.offsets_magnetometer = self.calibration.magnetometer
-            self.imu.mode = adafruit_bno055.NDOF_MODE
+            self.imu.mode = self.mode
             time.sleep(MODE_SETTLE_S)
         else:
             print("Imu is running uncalibrated")
 
+    def apply_bandwidths(self) -> None:
+        """The raw mode's filters (the driver goes through CONFIG mode and back)."""
+        if self.gyro_bandwidth is None:
+            return
+        self.imu.gyro_bandwidth = self.gyro_bandwidth
+        self.imu.accel_bandwidth = self.accel_bandwidth
+        time.sleep(MODE_SETTLE_S)
+        print(f"[IMU]: mode {self.mode:#x}, gyro bandwidth {self.imu.gyro_bandwidth:#x}, "
+              f"accelerometer {self.imu.accel_bandwidth:#x}")
+
     def recover(self) -> None:
-        """Put a BNO055 that has fallen out of NDOF mode back to work.
+        """Put a BNO055 that has fallen out of its mode back to work.
 
         After a reset (e.g. a supply dip) the sensor boots in CONFIG mode,
         has lost its offsets and the driver reads (None, None, None).
@@ -150,8 +171,9 @@ class Imu:
             time.sleep(MODE_SETTLE_S)
             self.imu.axis_remap = AXIS_REMAP_NONE
             self.apply_calibration()
-            self.imu.mode = adafruit_bno055.NDOF_MODE
+            self.imu.mode = self.mode
             time.sleep(MODE_SETTLE_S)
+            self.apply_bandwidths()
         except Exception as e:
             print("[IMU]: reconfiguration failed:", e)
 
@@ -173,14 +195,14 @@ class Imu:
             s = time.time()
             try:
                 if s - last_mode_check >= MODE_CHECK_PERIOD_S:
-                    measuring = self.imu.mode == adafruit_bno055.NDOF_MODE
+                    measuring = self.imu.mode == self.mode
                     last_mode_check = s
                 gyro, accelero = self.read_sample()
             except Exception as e:
                 print("[IMU]:", e)
                 continue
 
-            # Out of NDOF mode (e.g. reset by a supply dip) the sensor gives
+            # Out of its mode (e.g. reset by a supply dip) the sensor gives
             # no data; never let that reach the policy.
             if not measuring or not accelero.any():
                 last_mode_check = 0.0  # look again at the next sample

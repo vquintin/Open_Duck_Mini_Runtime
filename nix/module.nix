@@ -45,7 +45,9 @@ let
     "-i" (toString walk.pid.i)
     "-d" (toString walk.pid.d)
     "--pitch_bias" (toString walk.pitchBias)
+    "--imu_mode" walk.imu.mode
   ]
+  ++ lib.optionals (walk.imu.mode == "amg") [ "--gyro_bandwidth" (toString walk.imu.gyroBandwidth) ]
   ++ lib.optionals (walk.cutoffFrequency != null) [ "--cutoff_frequency" (toString walk.cutoffFrequency) ]
   ++ lib.optionals (walk.telemetry.dir != null) [ "--telemetry_dir" walk.telemetry.dir ]
   ++ lib.optionals walk.commands [ "--commands" ]
@@ -226,6 +228,26 @@ in
           type = lib.types.str;
           default = "30d";
           description = "How long recordings are kept (a systemd-tmpfiles age).";
+        };
+      };
+
+      imu = {
+        mode = lib.mkOption {
+          type = lib.types.enum [ "ndof" "amg" ];
+          default = "amg";
+          description = ''
+            The BNO055's operating mode. "amg" reads the gyro and the
+            accelerometer raw, with the filters below: the policy's gyro is
+            then ~30 ms fresher than in the fused "ndof" (which the walk never
+            needed: it uses no orientation). With "ndof", run27 standing still
+            swayed at 2 Hz (0.29 rad/s); with "amg" it stood still (2026-10-21).
+          '';
+        };
+
+        gyroBandwidth = lib.mkOption {
+          type = lib.types.enum [ 12 23 32 47 64 116 230 523 ];
+          default = 116;
+          description = "Gyro low-pass bandwidth in Hz, in \"amg\" mode (mini_bdx_runtime/imu_modes.py).";
         };
       };
 

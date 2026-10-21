@@ -53,7 +53,8 @@ let
   ++ lib.optionals walk.commands [ "--commands" ]
   ++ walk.extraArgs);
 
-  hardwareGroups = [ "dialout" "i2c" "gpio" "audio" "input" ];
+  # video: /dev/vcio, the firmware mailbox the walk reads the Pi's undervoltage from
+  hardwareGroups = [ "dialout" "i2c" "gpio" "audio" "input" "video" ];
 
   controller = cfg.controller;
 
@@ -329,11 +330,17 @@ in
       }
     ];
 
-    services.udev.extraRules = lib.mkIf hasServoBoard (''
-      SUBSYSTEM=="tty", ATTRS{idVendor}=="${servoBoard.vendorId}", ATTRS{idProduct}=="${servoBoard.productId}", SYMLINK+="${servoBoard.name}", TAG+="systemd"''
-      # (Re)start the walk whenever the board (re)appears.
-      + lib.optionalString walk.restart '', ENV{SYSTEMD_WANTS}+="open-duck-walk.service"''
-      + "\n");
+    services.udev.extraRules = lib.mkMerge [
+      (lib.mkIf hasServoBoard (''
+        SUBSYSTEM=="tty", ATTRS{idVendor}=="${servoBoard.vendorId}", ATTRS{idProduct}=="${servoBoard.productId}", SYMLINK+="${servoBoard.name}", TAG+="systemd"''
+        # (Re)start the walk whenever the board (re)appears.
+        + lib.optionalString walk.restart '', ENV{SYSTEMD_WANTS}+="open-duck-walk.service"''
+        + "\n"))
+      # The firmware's throttled / undervoltage state (pi_power.py), root-only by default.
+      ''
+        KERNEL=="vcio", GROUP="video", MODE="0660"
+      ''
+    ];
 
     users.users.${walk.user} = lib.mkIf (walk.user == "open-duck") {
       isSystemUser = true;

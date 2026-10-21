@@ -19,6 +19,7 @@ from mini_bdx_runtime.projector import Projector
 from mini_bdx_runtime.raw_imu import Imu
 from mini_bdx_runtime.rl_utils import LowPassActionFilter, make_action_dict
 from mini_bdx_runtime.feetech_bus import HealthPoller
+from mini_bdx_runtime.pi_power import PiPower, decode_throttled
 from mini_bdx_runtime.rustypot_position_hwi import HWI
 from mini_bdx_runtime.sounds import Sounds
 from mini_bdx_runtime.telemetry import TelemetryWriter
@@ -53,6 +54,9 @@ DOF_VEL_OBS_SCALE = 0.05
 # (the STS3215 drops its torque at 70: canard's right knee did, 2026-10-21).
 HEALTH_POLL_STEPS = 50
 SERVO_HOT_C = 60
+# The Pi's throttled state (pi_power.py), read once a second at this step of
+# HEALTH_POLL_STEPS, one no servo register is read at.
+PI_POWER_PHASE = HEALTH_POLL_STEPS - 1
 
 # Control defaults.
 DEFAULT_PID = (30, 0, 0)
@@ -150,6 +154,10 @@ class RLWalk:
         self.hwi = HWI(self.duck_config, serial_port)
         self.health = HealthPoller(self.hwi.io, list(self.hwi.joints.values()), every=HEALTH_POLL_STEPS)
         self.hot_servos: set[str] = set()
+        self.pi_power = PiPower()
+        self.pi_throttled: int | None = None
+        self.pi_temp: float | None = None
+        self.health_steps = 0
 
         self.start()
 
@@ -313,7 +321,11 @@ class RLWalk:
         self.reset_stats()
 
     def poll_health(self) -> None:
-        """One of the servos' health registers a step; warn once when one runs hot."""
+        """One of the servos' health registers a step, the Pi's supply once a
+        second; warn once when a servo runs hot or the Pi saw an undervoltage."""
+        if self.health_steps % HEALTH_POLL_STEPS == PI_POWER_PHASE:
+            self.poll_pi_power()
+        self.health_steps += 1
         try:
             self.health.step()
         except Exception as e:
@@ -329,12 +341,22 @@ class RLWalk:
             elif temp < SERVO_HOT_C - 5:
                 self.hot_servos.discard(joint)
 
+    def poll_pi_power(self) -> None:
+        bits = self.pi_power.throttled()
+        self.pi_temp = self.pi_power.temperature()
+        if bits is not None and bits != self.pi_throttled:
+            state = [k for k, v in decode_throttled(bits).items() if v]
+            if state:
+                print(f"[pi power]: {hex(bits)} {', '.join(state)}")
+        self.pi_throttled = bits
+
     def health_telemetry(self) -> dict:
+        pi = {"pi_throttled": self.pi_throttled or 0, "pi_temp": self.pi_temp or 0.0}
         h = self.health.health
         if h is None:
             zeros = np.zeros(self.num_dofs)
-            return {"servo_temp": zeros, "servo_voltage": zeros, "servo_status": zeros}
-        return {"servo_temp": h.temperature, "servo_voltage": h.voltage, "servo_status": h.status}
+            return {"servo_temp": zeros, "servo_voltage": zeros, "servo_status": zeros, **pi}
+        return {"servo_temp": h.temperature, "servo_voltage": h.voltage, "servo_status": h.status, **pi}
 
     def open_telemetry(self) -> None:
         """Start this walk's recording; tools/sim replay read it back."""
@@ -357,6 +379,8 @@ class RLWalk:
                 ("servo_temp", "u1", (self.num_dofs,)),  # deg C, last read (0: not yet)
                 ("servo_voltage", "f4", (self.num_dofs,)),  # V, last read
                 ("servo_status", "u1", (self.num_dofs,)),  # error bits, last read
+                ("pi_throttled", "u4", ()),  # vcgencmd get_throttled's bits, last read
+                ("pi_temp", "f4", ()),  # deg C, the SoC's, last read (0: unread)
             ],
             {
                 "kind": "walk",

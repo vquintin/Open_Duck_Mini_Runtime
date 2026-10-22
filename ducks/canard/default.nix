@@ -31,14 +31,14 @@
     # augmentation and mirror loss 0.3. In sim: falls on the real terrain
     # 7/180 (all terrain 14/180, run27 36), forward 0.089, sideways 0.094 /
     # 0.096, standing leg jitter 0.009 (0.035 with sensor noise).
-    onnxModelPath = ./canard_walk_8.onnx;
-    # The next candidate, to try once the head's roll bearing is reprinted:
+    # onnxModelPath = ./canard_walk_8.onnx;  # run30, the fallback
+    # run31 at 32M, on trial since 2026-10-22:
     # run31 at 32M (dba709e, from run30), trained on commands changing every
     # 2-6 s, a quarter of them stops, as canard tipped back and fell on sharp
     # stops with run30. In sim: sharp stops from 0.15 m/s 0/25 falls (run30
     # 5/26), tipping back 5.5 deg (6.9); real terrain 10/180, all terrain
     # 22/180; standing jitter 0.011.
-    # onnxModelPath = ./canard_walk_9.onnx;
+    onnxModelPath = ./canard_walk_9.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

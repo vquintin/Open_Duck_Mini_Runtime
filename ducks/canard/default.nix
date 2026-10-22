@@ -39,6 +39,10 @@
     # 5/26), tipping back 5.5 deg (6.9); real terrain 10/180, all terrain
     # 22/180; standing jitter 0.011.
     onnxModelPath = ./canard_walk_9.onnx;
+    # run32 at 38M (66d8a44, from run30): commands every 3-8 s, 15% stops.
+    # In sim: real terrain 6/180, all terrain 31/180; sharp stops 1/26,
+    # tipping back 6.4 deg; standing jitter 0.010. To try against run31:
+    # onnxModelPath = ./canard_walk_10.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

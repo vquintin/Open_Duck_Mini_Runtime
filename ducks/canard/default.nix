@@ -23,20 +23,15 @@
   ];
 
   services.open-duck.walk = {
-    # Trained for canard (Open_Duck_Playground branch canard, f17455c, run27
-    # at 41M, from run26 at 41M = canard_walk_6.onnx, from run25 =
-    # canard_walk_5.onnx): the real soles, hills, pebbles and steps, a
-    # left-right symmetric reference gait and symmetry augmentation, on the
-    # home pose of init_pos (made its own mirror image), which it needs; the
-    # joint noise on both legs, each joint's backlash per episode; canard's
-    # weighed masses, 2605 g; the IMU delay on the gyro and accelerometer it
-    # reads, walk commands below 0.02 m/s / 0.1 rad/s zeroed (as the runtime
-    # does), stand_still -0.5. Over canard_walk_6: the IMU 0-60 ms late (0-40),
-    # canard's gyro reading 20-40 ms behind its encoders; 10% zero commands
-    # (25). In sim: falls on the real terrain 14/180, forward 0.080 for 0.15,
-    # standing leg jitter 0.018 (0.052 with sensor noise); slow to start
-    # sideways from standing (~1 s, 0.4 for canard_walk_5).
-    onnxModelPath = ./canard_walk_7.onnx;
+    # Trained for canard (Open_Duck_Playground branch canard, de0ffa5, run30
+    # at 41M, from run27 at 41M = canard_walk_7.onnx, which walked canard
+    # steadily once its IMU read raw): the raw IMU 0-40 ms late, the actions
+    # 0-40 ms, the servos' kp x0.85-1.15, the gyro's gain drawn per episode,
+    # the soles fitted on canard's walk (25 N.m/rad, damped 0.13); symmetry
+    # augmentation and mirror loss 0.3. In sim: falls on the real terrain
+    # 7/180 (all terrain 14/180, run27 36), forward 0.089, sideways 0.094 /
+    # 0.096, standing leg jitter 0.009 (0.035 with sensor noise).
+    onnxModelPath = ./canard_walk_8.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

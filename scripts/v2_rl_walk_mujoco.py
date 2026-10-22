@@ -10,6 +10,7 @@ sys.modules["pkg_resources"] = None
 
 import numpy as np
 from mini_bdx_runtime.antennas import Antennas
+from mini_bdx_runtime.command_ramp import CommandRamp
 from mini_bdx_runtime.duck_config import DuckConfig
 from mini_bdx_runtime.eyes import Eyes
 from mini_bdx_runtime.feet_contacts import FeetContacts
@@ -186,6 +187,8 @@ class RLWalk:
         self.prev_motor_targets = np.array(self.init_pos.copy())
 
         self.last_commands = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        # The sticks' walk command, slewed: a sharp stop tipped canard back.
+        self.command_ramp = CommandRamp(1 / self.control_freq)
 
         self.paused = self.duck_config.start_paused
 
@@ -435,6 +438,8 @@ class RLWalk:
                     self.last_commands, self.buttons, left_trigger, right_trigger = (
                         self.xbox_controller.get_last_command()
                     )
+                    self.last_commands = list(self.last_commands)
+                    self.last_commands[0:3] = self.command_ramp.step(self.last_commands[0:3])
                     if self.buttons.dpad_up.triggered:
                         self.phase_frequency_factor_offset += PHASE_FREQ_OFFSET_STEP
                         offset = round(self.phase_frequency_factor_offset, 3)
@@ -476,6 +481,7 @@ class RLWalk:
                 if self.paused:
                     time.sleep(PAUSE_POLL_S)
                     self.reset_stats()
+                    self.command_ramp.reset()
                     # Nothing reads the servos while paused.
                     self.last_servo_read_t = time.time()
                     continue

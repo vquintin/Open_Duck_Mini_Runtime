@@ -3,7 +3,7 @@ import struct
 import time
 from dataclasses import dataclass
 from queue import Empty, Queue
-from threading import Thread
+from threading import Event, Thread
 from typing import Any
 
 import adafruit_bno055
@@ -104,11 +104,14 @@ class Imu:
         mode: str = "ndof",
         gyro_bandwidth_hz: float | None = None,
         accel_bandwidth_hz: float | None = None,
+        synchronous: bool = False,
     ) -> None:
         """orientation: the IMU's in the robot frame (v_robot = orientation @
         v_imu, see imu_orientation.py); None reports the sensor's own axes.
         mode: "ndof" (fused, the sensor's filters) or "amg" (raw, with these
-        bandwidths; see imu_modes.py)."""
+        bandwidths; see imu_modes.py). synchronous: get_data() reads the
+        sensor itself (one burst, ~2 ms on the bit-banged bus) instead of
+        taking a worker's sample, up to a sampling period old."""
         self.mode, self.gyro_bandwidth, self.accel_bandwidth = imu_settings(
             mode, gyro_bandwidth_hz, accel_bandwidth_hz
         )
@@ -130,8 +133,14 @@ class Imu:
         }
         self._register = bytes((DATA_REGISTER,))
         self._buffer = bytearray(DATA_LENGTH)
+        self.synchronous = synchronous
+        self._bad_samples = 0
+        self._measuring = True
+        self._last_mode_check = 0.0
+        self._recovering = Event()  # synchronous: recover() runs on its own thread
         self.imu_queue: Queue = Queue(maxsize=SAMPLE_QUEUE_SIZE)
-        Thread(target=self.imu_worker, daemon=True).start()
+        if not synchronous:
+            Thread(target=self.imu_worker, daemon=True).start()
 
     def apply_calibration(self) -> None:
         if self.calibration is not None:
@@ -187,65 +196,83 @@ class Imu:
             np.array((ax, ay, az)) * ACCELERO_SCALE,
         )
 
+    def _sample(self) -> dict[str, Any] | None:
+        """One reading in the robot's axes, or None: an I2C error, a sensor
+        out of its mode (recovered after RECOVER_AFTER_BAD_SAMPLES), a spike."""
+        s = time.time()
+        try:
+            if s - self._last_mode_check >= MODE_CHECK_PERIOD_S:
+                self._measuring = self.imu.mode == self.mode
+                self._last_mode_check = s
+            gyro, accelero = self.read_sample()
+        except Exception as e:
+            print("[IMU]:", e)
+            return None
+
+        # Out of its mode (e.g. reset by a supply dip) the sensor gives
+        # no data; never let that reach the policy.
+        if not self._measuring or not accelero.any():
+            self._last_mode_check = 0.0  # look again at the next sample
+            self._bad_samples += 1
+            if self._bad_samples == 1:
+                print("[IMU]: no data from the sensor")
+            if self._bad_samples % RECOVER_AFTER_BAD_SAMPLES == 0:
+                if self.synchronous:
+                    self._recovering.set()
+                    Thread(target=self._recover_in_background, daemon=True).start()
+                else:
+                    self.recover()
+            return None
+        if self._bad_samples:
+            print(f"[IMU]: data back after {self._bad_samples} bad samples")
+            self._bad_samples = 0
+
+        gyro = self.orientation @ gyro
+        accelero = self.orientation @ accelero
+
+        # Drop spikes; get_data() then keeps returning the last good
+        # sample.
+        if (
+            np.linalg.norm(gyro) > GYRO_MAX_NORM
+            or np.linalg.norm(accelero) > ACCELERO_MAX_NORM
+        ):
+            self.rejected_samples += 1
+            if self.printed_spikes < PRINTED_SPIKES:
+                self.printed_spikes += 1
+                print(f"[IMU]: rejected spike gyro={gyro} accelero={accelero}")
+            return None
+
+        return {
+            "gyro": gyro,
+            "accelero": accelero,
+            "t": s,  # time.time() when the sample was read
+        }
+
+    def _recover_in_background(self) -> None:
+        try:
+            self.recover()
+        finally:
+            self._last_mode_check = 0.0
+            self._recovering.clear()
+
     def imu_worker(self) -> None:
-        bad_samples = 0
-        measuring = True
-        last_mode_check = 0.0
         while True:
             s = time.time()
-            try:
-                if s - last_mode_check >= MODE_CHECK_PERIOD_S:
-                    measuring = self.imu.mode == self.mode
-                    last_mode_check = s
-                gyro, accelero = self.read_sample()
-            except Exception as e:
-                print("[IMU]:", e)
-                continue
-
-            # Out of its mode (e.g. reset by a supply dip) the sensor gives
-            # no data; never let that reach the policy.
-            if not measuring or not accelero.any():
-                last_mode_check = 0.0  # look again at the next sample
-                bad_samples += 1
-                if bad_samples == 1:
-                    print("[IMU]: no data from the sensor")
-                if bad_samples % RECOVER_AFTER_BAD_SAMPLES == 0:
-                    self.recover()
-                time.sleep(1 / self.sampling_freq)
-                continue
-            if bad_samples:
-                print(f"[IMU]: data back after {bad_samples} bad samples")
-                bad_samples = 0
-
-            gyro = self.orientation @ gyro
-            accelero = self.orientation @ accelero
-
-            # Drop spikes; get_data() then keeps returning the last good
-            # sample.
-            if (
-                np.linalg.norm(gyro) > GYRO_MAX_NORM
-                or np.linalg.norm(accelero) > ACCELERO_MAX_NORM
-            ):
-                self.rejected_samples += 1
-                if self.printed_spikes < PRINTED_SPIKES:
-                    self.printed_spikes += 1
-                    print(f"[IMU]: rejected spike gyro={gyro} accelero={accelero}")
-                time.sleep(1 / self.sampling_freq)
-                continue
-
-            data = {
-                "gyro": gyro,
-                "accelero": accelero,
-                "t": s,  # time.time() when the sample was read
-            }
-            # Replace a sample the walk hasn't taken: it gets the freshest.
-            with contextlib.suppress(Empty):
-                self.imu_queue.get_nowait()
-            self.imu_queue.put(data)
-            took = time.time() - s
-            time.sleep(max(0, 1 / self.sampling_freq - took))
+            data = self._sample()
+            if data is not None:
+                # Replace a sample the walk hasn't taken: it gets the freshest.
+                with contextlib.suppress(Empty):
+                    self.imu_queue.get_nowait()
+                self.imu_queue.put(data)
+            time.sleep(max(0, 1 / self.sampling_freq - (time.time() - s)))
 
     def get_data(self) -> dict[str, Any]:
+        if self.synchronous:
+            if not self._recovering.is_set():
+                data = self._sample()
+                if data is not None:
+                    self.last_imu_data = data
+            return self.last_imu_data
         with contextlib.suppress(Exception):
             self.last_imu_data = self.imu_queue.get(False)  # non blocking
 

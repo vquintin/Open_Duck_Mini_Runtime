@@ -114,6 +114,7 @@ class RLWalk:
         zero_gyro_yaw: bool = False,
         imu_mode: str = "ndof",
         gyro_bandwidth: float | None = None,
+        imu_thread: bool = False,
     ) -> None:
         self.duck_config = DuckConfig(config_json_path=duck_config_path)
 
@@ -130,6 +131,8 @@ class RLWalk:
         # torso's yaw wobble is fed by the policy's own reaction to it.
         self.zero_gyro_yaw = zero_gyro_yaw
         self.last_gyro = np.zeros(3)  # as measured, for telemetry
+        self.last_imu_age = 0.0  # s, the sample's age when the policy got it
+        self.imu_thread = imu_thread
         self.imu_mode = imu_mode
         self.gyro_bandwidth = gyro_bandwidth
 
@@ -168,6 +171,9 @@ class RLWalk:
             calibration = self.duck_config.imu_calib,
             mode=self.imu_mode,
             gyro_bandwidth_hz=self.gyro_bandwidth,
+            # read when the observation is built: a worker's sample was
+            # 19.5 ms old in the median (canard, 2026-10-24)
+            synchronous=not self.imu_thread,
         )
 
         self.feet_contacts = FeetContacts()
@@ -257,6 +263,7 @@ class RLWalk:
 
         gyro = np.array(imu_data["gyro"], dtype=np.float64)
         self.last_gyro = gyro.copy()
+        self.last_imu_age = time.time() - imu_data["t"]
         if self.zero_gyro_yaw:
             gyro[2] = 0.0
 
@@ -379,6 +386,7 @@ class RLWalk:
                 ("took", "f4", ()),  # s spent in the step before sleeping
                 ("marker", "u1", ()),  # RB pressed: something worth a look
                 ("gyro", "f4", (3,)),  # rad/s as measured (obs may hide the yaw)
+                ("imu_age", "f4", ()),  # s, the IMU sample's age when the observation was built
                 ("servo_temp", "u1", (self.num_dofs,)),  # deg C, last read (0: not yet)
                 ("servo_voltage", "f4", (self.num_dofs,)),  # V, last read
                 ("servo_status", "u1", (self.num_dofs,)),  # error bits, last read
@@ -399,6 +407,7 @@ class RLWalk:
                 "obs_layout": OBS_LAYOUT,
                 "zero_gyro_yaw": self.zero_gyro_yaw,
                 "imu_mode": self.imu_mode,
+                "imu_thread": self.imu_thread,
                 "gyro_bandwidth": self.gyro_bandwidth,
             },
         )
@@ -591,6 +600,7 @@ class RLWalk:
                         took=took,
                         marker=mark_next_step,
                         gyro=self.last_gyro,
+                        imu_age=self.last_imu_age,
                         **self.health_telemetry(),
                     )
                     mark_next_step = False
@@ -696,6 +706,11 @@ if __name__ == "__main__":
         help="the BNO055's: fused, or raw (~30 ms fresher gyro) with --gyro_bandwidth",
     )
     parser.add_argument("--gyro_bandwidth", type=float, default=None, help="Hz, raw mode only")
+    parser.add_argument(
+        "--imu_thread",
+        action="store_true",
+        help="take the IMU worker's latest sample (up to a step old) instead of reading it each step",
+    )
 
     args = parser.parse_args()
     pid = [args.p, args.i, args.d]
@@ -719,6 +734,7 @@ if __name__ == "__main__":
         zero_gyro_yaw=args.zero_gyro_yaw,
         imu_mode=args.imu_mode,
         gyro_bandwidth=args.gyro_bandwidth,
+        imu_thread=args.imu_thread,
     )
     print("Done instantiating RLWalk")
     rl_walk.run()

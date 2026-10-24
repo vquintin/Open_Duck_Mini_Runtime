@@ -43,6 +43,14 @@
     # In sim: real terrain 6/180, all terrain 31/180; sharp stops 1/26,
     # tipping back 6.4 deg; standing jitter 0.010. To try against run31:
     # onnxModelPath = ./canard_walk_10.onnx;
+    # c3, the curriculum from scratch (Open_Duck_Playground dccf088,
+    # curriculum/canard.toml, S7 at 11.8M of its extension). In sim, run31's
+    # in brackets: real terrain 8/180 (10), all terrain 17/180 (22); sharp
+    # stops 0/269 (0/237), tipping back 1.0 deg median (5.5); reversals
+    # 0/135 (7/118); standing jitter 0.010 (0.010), calm 95% (98%);
+    # forward 0.122 (0.135), half 0.081 (0.073), sideways 0.081 / 0.083
+    # (0.105 / 0.094). To try against run31:
+    # onnxModelPath = ./canard_walk_11.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

@@ -7,11 +7,28 @@ Sts3215PyController reads everything; the same units: rad, rad/s (measured
 on canard against 0.1.0 and against d(position)/dt).
 """
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
 # present_voltage counts tenths of a volt.
 VOLTS_PER_UNIT = 0.1
+# present_position (2 bytes) then present_speed (2 bytes): one sync read for both
+PRESENT_POSITION_ADDR = 56
+RAD_PER_STEP = 2 * math.pi / 4096  # an encoder step; the speed counts steps/s
+MIDDLE_STEP = 2048  # position 0 rad
+SPEED_SIGN_BIT = 0x8000  # the speed's sign, its magnitude in the lower 15 bits
+
+
+def decode_position_and_speed(raw: list[int]) -> tuple[float, float]:
+    """(rad, rad/s) from present_position and present_speed's 4 bytes."""
+    position = raw[0] | raw[1] << 8
+    speed = raw[2] | raw[3] << 8
+    magnitude = speed & ~SPEED_SIGN_BIT
+    return (
+        (position - MIDDLE_STEP) * RAD_PER_STEP,
+        (-magnitude if speed & SPEED_SIGN_BIT else magnitude) * RAD_PER_STEP,
+    )
 
 
 @dataclass(frozen=True)
@@ -31,6 +48,11 @@ class FeetechBus:
 
     def read_present_velocity(self, ids: list[int]) -> list[float]:
         return list(self.io.sync_read_present_speed(ids))
+
+    def read_present_position_and_velocity(self, ids: list[int]) -> tuple[list[float], list[float]]:
+        """Both in one sync read (rad, rad/s), where the two reads above take two."""
+        decoded = [decode_position_and_speed(list(r)) for r in self.io.sync_read_raw_data(ids, PRESENT_POSITION_ADDR, 4)]
+        return [p for p, _ in decoded], [v for _, v in decoded]
 
     def write_goal_position(self, ids: list[int], positions: list[float]) -> None:
         self.io.sync_write_goal_position(ids, list(positions))

@@ -63,3 +63,28 @@ def test_health_is_polled_one_register_a_step_about_once_a_second(bus):
         poll.step()
     assert calls == ["present_temperature", "present_voltage", "status"] * 2  # each once per 50 steps, apart
     assert poll.health == ServoHealth(temperature=[38, 55], voltage=[7.8, 7.7], status=[0, 32])
+
+
+class RawController:
+    """Sts3215PyController's raw sync read: per servo, `length` bytes from `addr`."""
+
+    def __init__(self, raw):
+        self.raw, self.calls = raw, []
+
+    def sync_read_raw_data(self, ids, addr, length):
+        self.calls.append((list(ids), addr, length))
+        return [self.raw[i] for i in ids]
+
+
+def test_position_and_speed_come_in_one_sync_read():
+    import math
+
+    # present_position (addr 56) then present_speed (58), little endian; the
+    # speed's bit 15 is its sign (STS3215 memory table)
+    raw = {20: [0x00, 0x08, 0x10, 0x00], 13: [0x00, 0x0C, 0x10, 0x80]}
+    bus = FeetechBus(RawController(raw))
+    positions, speeds = bus.read_present_position_and_velocity([20, 13])
+    assert bus.io.calls == [([20, 13], 56, 4)]
+    step = 2 * math.pi / 4096
+    assert positions == pytest.approx([0.0, 1024 * step])  # 2048 is the middle
+    assert speeds == pytest.approx([16 * step, -16 * step])  # rad/s

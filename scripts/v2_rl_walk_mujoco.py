@@ -15,6 +15,7 @@ from mini_bdx_runtime.duck_config import DuckConfig
 from mini_bdx_runtime.eyes import Eyes
 from mini_bdx_runtime.feet_contacts import FeetContacts
 from mini_bdx_runtime.onnx_infer import OnnxInfer
+from mini_bdx_runtime.parallel_reads import ParallelReads
 from mini_bdx_runtime.poly_reference_motion import PolyReferenceMotion
 from mini_bdx_runtime.projector import Projector
 from mini_bdx_runtime.raw_imu import Imu
@@ -176,6 +177,14 @@ class RLWalk:
             synchronous=not self.imu_thread,
         )
 
+        # the servos read on a worker thread while this one reads the IMU,
+        # positions and speeds in one sync read if it reads what rustypot does
+        self.reads = ParallelReads()
+        self.combined_servo_read = self.hwi.combined_read_agrees()
+        if not self.combined_servo_read:
+            print("Servo positions and speeds read separately: the combined read disagrees")
+        self.last_reads_s = (0.0, 0.0)  # s from the reads' start to the servos', the IMU's end
+
         self.feet_contacts = FeetContacts()
 
         # Scales
@@ -230,22 +239,17 @@ class RLWalk:
         if self.duck_config.antennas:
             self.antennas = Antennas()
 
+    def read_servos(self) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """(rad, rad/s) or Nones."""
+        ignore = ["left_antenna", "right_antenna"]
+        if self.combined_servo_read:
+            read = self.hwi.get_present_positions_and_velocities(ignore=ignore)
+            return read if read is not None else (None, None)
+        return self.hwi.get_present_positions(ignore=ignore), self.hwi.get_present_velocities(ignore=ignore)
+
     def get_obs(self) -> np.ndarray | None:
-        imu_data = self.imu.get_data()
-
-        dof_pos = self.hwi.get_present_positions(
-            ignore=[
-                "left_antenna",
-                "right_antenna",
-            ]
-        )  # rad
-
-        dof_vel = self.hwi.get_present_velocities(
-            ignore=[
-                "left_antenna",
-                "right_antenna",
-            ]
-        )  # rad/s
+        (dof_pos, dof_vel), imu_data = self.reads.read(self.read_servos, self.imu.get_data)
+        self.last_reads_s = (self.reads.servos_done - self.reads.started, self.reads.imu_done - self.reads.started)
 
         if dof_pos is None or dof_vel is None:
             return None
@@ -387,6 +391,8 @@ class RLWalk:
                 ("marker", "u1", ()),  # RB pressed: something worth a look
                 ("gyro", "f4", (3,)),  # rad/s as measured (obs may hide the yaw)
                 ("imu_age", "f4", ()),  # s, the IMU sample's age when the observation was built
+                ("servo_read_s", "f4", ()),  # s from the reads' start to the servos' read
+                ("imu_read_s", "f4", ()),  # s from the reads' start to the IMU's (in parallel)
                 ("servo_temp", "u1", (self.num_dofs,)),  # deg C, last read (0: not yet)
                 ("servo_voltage", "f4", (self.num_dofs,)),  # V, last read
                 ("servo_status", "u1", (self.num_dofs,)),  # error bits, last read
@@ -408,6 +414,7 @@ class RLWalk:
                 "zero_gyro_yaw": self.zero_gyro_yaw,
                 "imu_mode": self.imu_mode,
                 "imu_thread": self.imu_thread,
+                "combined_servo_read": self.combined_servo_read,
                 "gyro_bandwidth": self.gyro_bandwidth,
             },
         )
@@ -601,6 +608,8 @@ class RLWalk:
                         marker=mark_next_step,
                         gyro=self.last_gyro,
                         imu_age=self.last_imu_age,
+                        servo_read_s=self.last_reads_s[0],
+                        imu_read_s=self.last_reads_s[1],
                         **self.health_telemetry(),
                     )
                     mark_next_step = False

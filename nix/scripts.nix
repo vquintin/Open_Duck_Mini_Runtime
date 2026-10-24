@@ -29,6 +29,7 @@ let
     "new_record_data"
     "excite_servos"
     "sway_delay"
+    "read_bench"
   ];
 
   # Nicer command names than the raw filename for a few scripts.

@@ -180,6 +180,34 @@ class HWI:
         ]
         return np.array(np.around(present_positions, ROUND_DECIMALS))
 
+    def get_present_positions_and_velocities(
+        self, ignore: Sequence[str] = ()
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """get_present_positions() and get_present_velocities() in one sync
+        read (rad, rad/s)."""
+        try:
+            positions, velocities = self.io.read_present_position_and_velocity(list(self.joints.values()))
+        except Exception as e:
+            print(e)
+            return None
+        kept = [
+            (pos - self.joints_offsets[joint], vel)
+            for joint, pos, vel in zip(self.joints.keys(), positions, velocities, strict=True)
+            if joint not in ignore
+        ]
+        return (
+            np.array(np.around([p for p, _ in kept], ROUND_DECIMALS)),
+            np.array(np.around([v for _, v in kept], ROUND_DECIMALS)),
+        )
+
+    def combined_read_agrees(self, tolerance: float = 0.005) -> bool:
+        """Whether the one-read positions match rustypot's own conversion (rad)."""
+        separate = self.get_present_positions()
+        combined = self.get_present_positions_and_velocities()
+        if separate is None or combined is None:
+            return False
+        return bool(np.max(np.abs(separate - combined[0])) <= tolerance)
+
     def get_present_velocities(
         self, rad_s: bool = True, ignore: Sequence[str] = ()
     ) -> np.ndarray | None:

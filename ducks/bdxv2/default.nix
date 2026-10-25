@@ -8,7 +8,7 @@
 
   # Wi-Fi networks, most preferred first; each one's passphrase goes in
   # wireless.env on the firmware partition, as psk_<ssid> (see nix/wifi.nix).
-  duck.wifiNetworks = [ "Okartie" "kazoboner" "O-P1-K-nooby" ];
+  duck.wifiNetworks = [ "Okartie" "kasoboner" "O-P1-K-nooby" ];
   # Pinned so that /etc being an overlay doesn't hand the duck a new one (and
   # its journal a new directory) on every boot.
   environment.etc.machine-id.text = "1798b7897f922e6449fc281238e977e0\n";
@@ -26,6 +26,8 @@
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDGgsoGWvO4ZtWyjJMpJ+beie8/+JTFFWDAQyXxztbOO virgile@desktop"
     # From the Raspbian duck's ~/.ssh/authorized_keys.
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDPcPy0g5Z7SdJZxDg/K2YdMHhFWyy8xHNAWChxs8AyIvirouhI8G2GSNF9+ZcCcJ+LxEsTEWK8eiP0dafUCDVKDIUWLSQuZnmNCC9KRrAZEqY59qPz6iINbW7WrNnqs9pbfip9D/OEflA5Uq70vKuPaC7xNdwxF2kk8/+NCRxjGgA/ravUma7L6bxCuguMS4XcJb3Cg4y2+XmQPQ1Si3MDK6aHpPoU7pKscLzGCLUcpev0q3syW2eyAOQ9BhkJJFod99K0aUSsRfQgMS6PY2QOce0XlpaqeURvDHR+5C4muTo628IeAC7xULutCDlfqU+aa96ZMjXDQQtpOBJZdaZ7iYNvYRce6ONkB4ilx6Ug9M6/InqBSCRDT43fv5BtEJYzqzc6m1kau/GFk3hQoxGOzbY3xSkTn5zFN9BGoQY9odFXY4wZN/12+yCiRScro1e2oAjYr2RRhh/J/nnZv2SdMcn+Qc7uY2A9VklS2yV8cQDy5ufmnujmjsCd+NW7HGE= vquintin@desktop"
+    # Olivier's Mac (~/.ssh/idssh).
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIABMIKdgyqVwBimAQPlecj3t1wUq9CEQGhwxS09B4KS/ payetolivier@Mac.home"
   ];
 
   services.open-duck.walk = {

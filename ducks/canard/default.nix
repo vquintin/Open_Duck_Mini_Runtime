@@ -38,7 +38,10 @@
     # stops with run30. In sim: sharp stops from 0.15 m/s 0/25 falls (run30
     # 5/26), tipping back 5.5 deg (6.9); real terrain 10/180, all terrain
     # 22/180; standing jitter 0.011.
-    # onnxModelPath = ./canard_walk_9.onnx;  # run31, the fallback
+    # On trial again since 2026-10-25, with the runtime reading the IMU and the
+    # servos at once (the loop ~19 ms faster): on c4's sim it passes every gate
+    # (reversals 5%, sharp stops 0%, no rocking, terrain 10 / 22).
+    onnxModelPath = ./canard_walk_9.onnx;
     # run32 at 38M (66d8a44, from run30): commands every 3-8 s, 15% stops.
     # In sim: real terrain 6/180, all terrain 31/180; sharp stops 1/26,
     # tipping back 6.4 deg; standing jitter 0.010. To try against run31:
@@ -50,7 +53,7 @@
     # 0/135 (7/118); standing jitter 0.010 (0.010), calm 95% (98%);
     # forward 0.122 (0.135), half 0.081 (0.073), sideways 0.081 / 0.083
     # (0.105 / 0.094). On trial since 2026-10-24:
-    onnxModelPath = ./canard_walk_11.onnx;
+    # onnxModelPath = ./canard_walk_11.onnx;  # rocked standing still after sharp stops
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

@@ -69,10 +69,9 @@
     # Hz (its balance loop too strong for the real body, the trunk lagging
     # the ankles ~110 ms more than in sim); 0.25 walking.
     standingActionScale = 0.15;
-    # Its steps 20.5 ms apart (p90 20.6) but 0.6% over 25 ms, up to 37 ms,
-    # the step's work then 17-37 ms instead of 8.5 (telemetry 2026-10-28):
-    # nothing else in the way.
-    realtimePriority = 20;
+    # Not realtimePriority: at 20 canard dropped off the network minutes into
+    # a walk (2026-10-28), its SCHED_FIFO threads ahead of the kernel's
+    # SCHED_OTHER work (no threadirqs on this kernel).
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

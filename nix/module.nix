@@ -223,6 +223,16 @@ in
         description = "Low-pass action filter cutoff frequency (Hz). Null disables filtering.";
       };
 
+      realtimePriority = lib.mkOption {
+        type = lib.types.nullOr (lib.types.ints.between 1 49);
+        default = null;
+        description = ''
+          Run the walk SCHED_FIFO at this priority, under the kernel's IRQ
+          threads (50) so the USB serial and I2C still preempt it. Null: the
+          default scheduler.
+        '';
+      };
+
       telemetry = {
         dir = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
@@ -410,6 +420,8 @@ in
         # ALSA then logs an "underrun occurred" every ~80 ms (~1500 journal
         # lines in 2 min on a Pi Zero 2 W). No speaker, no sound card.
         ++ lib.optional (!speakerEnabled) "SDL_AUDIODRIVER=dummy";
+        CPUSchedulingPolicy = lib.mkIf (walk.realtimePriority != null) "fifo";
+        CPUSchedulingPriority = lib.mkIf (walk.realtimePriority != null) walk.realtimePriority;
         # The walk only cleans up (peripherals, "TURNING OFF") on
         # KeyboardInterrupt. On SIGTERM it ignored the stop, and systemd
         # SIGKILLed it after the 90 s stop timeout.

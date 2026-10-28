@@ -65,6 +65,10 @@
     # 0.99 (0.98 / 1.07); leg torque rms 1.14 N.m (1.03): watch the servos'
     # heat.
     onnxModelPath = ./canard_walk_12.onnx;
+    # On trial 2026-10-28: canard_walk_12 rocked standing still at 1.6-1.75
+    # Hz (its balance loop too strong for the real body, the trunk lagging
+    # the ankles ~110 ms more than in sim); 0.25 walking.
+    standingActionScale = 0.15;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

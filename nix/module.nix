@@ -49,7 +49,6 @@ let
   ]
   ++ lib.optionals (walk.imu.mode == "amg") [ "--gyro_bandwidth" (toString walk.imu.gyroBandwidth) ]
   ++ lib.optionals (walk.cutoffFrequency != null) [ "--cutoff_frequency" (toString walk.cutoffFrequency) ]
-  ++ lib.optionals (walk.standingActionScale != null) [ "--standing_action_scale" (toString walk.standingActionScale) ]
   ++ lib.optionals (walk.telemetry.dir != null) [ "--telemetry_dir" walk.telemetry.dir ]
   ++ lib.optionals walk.commands [ "--commands" ]
   ++ walk.extraArgs);
@@ -194,15 +193,6 @@ in
         type = lib.types.numbers.nonnegative;
         default = 0.25;
         description = "Action scale applied to the policy output.";
-      };
-
-      standingActionScale = lib.mkOption {
-        type = lib.types.nullOr lib.types.numbers.nonnegative;
-        default = null;
-        description = ''
-          Action scale while the walk command is zero, slewed in and out over
-          0.5 s: a weaker balance loop standing still. Null keeps actionScale.
-        '';
       };
 
       pid = {

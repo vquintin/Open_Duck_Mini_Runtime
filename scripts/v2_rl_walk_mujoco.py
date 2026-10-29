@@ -16,7 +16,6 @@ from mini_bdx_runtime.eyes import Eyes
 from mini_bdx_runtime.feet_contacts import FeetContacts
 from mini_bdx_runtime.onnx_infer import OnnxInfer
 from mini_bdx_runtime.parallel_reads import ParallelReads
-from mini_bdx_runtime.standing_scale import StandingScale
 from mini_bdx_runtime.poly_reference_motion import PolyReferenceMotion
 from mini_bdx_runtime.projector import Projector
 from mini_bdx_runtime.raw_imu import Imu
@@ -117,7 +116,6 @@ class RLWalk:
         imu_mode: str = "ndof",
         gyro_bandwidth: float | None = None,
         imu_thread: bool = False,
-        standing_action_scale: float | None = None,
     ) -> None:
         self.duck_config = DuckConfig(config_json_path=duck_config_path)
 
@@ -191,9 +189,6 @@ class RLWalk:
 
         # Scales
         self.action_scale = action_scale
-        self.standing_action_scale = standing_action_scale
-        self.standing_scale = StandingScale(action_scale, standing_action_scale, 1 / self.control_freq)
-        self.last_scale = action_scale
 
         self.last_action = np.zeros(self.num_dofs)
         self.last_last_action = np.zeros(self.num_dofs)
@@ -403,7 +398,6 @@ class RLWalk:
                 ("servo_status", "u1", (self.num_dofs,)),  # error bits, last read
                 ("pi_throttled", "u4", ()),  # vcgencmd get_throttled's bits, last read
                 ("pi_temp", "f4", ()),  # deg C, the SoC's, last read (0: unread)
-                ("scale", "f4", ()),  # the action scale applied (smaller standing still)
             ],
             {
                 "kind": "walk",
@@ -414,7 +408,6 @@ class RLWalk:
                 "kps": list(self.hwi.kps),
                 "control_freq": self.control_freq,
                 "action_scale": self.action_scale,
-                "standing_action_scale": self.standing_action_scale,
                 "max_motor_velocity": self.max_motor_velocity,
                 "max_target_offset": self.max_target_offset,
                 "obs_layout": OBS_LAYOUT,
@@ -560,8 +553,7 @@ class RLWalk:
                 self.last_last_action = self.last_action.copy()
                 self.last_action = action.copy()
 
-                self.last_scale = self.standing_scale.step(self.last_commands[0:3])
-                self.motor_targets = self.init_pos + action * self.last_scale
+                self.motor_targets = self.init_pos + action * self.action_scale
 
                 if self.action_filter is not None:
                     self.action_filter.push(self.motor_targets)
@@ -618,7 +610,6 @@ class RLWalk:
                         imu_age=self.last_imu_age,
                         servo_read_s=self.last_reads_s[0],
                         imu_read_s=self.last_reads_s[1],
-                        scale=self.last_scale,
                         **self.health_telemetry(),
                     )
                     mark_next_step = False
@@ -729,12 +720,6 @@ if __name__ == "__main__":
         action="store_true",
         help="take the IMU worker's latest sample (up to a step old) instead of reading it each step",
     )
-    parser.add_argument(
-        "--standing_action_scale",
-        type=float,
-        default=None,
-        help="the action scale while the walk command is zero, slewed in and out over 0.5 s",
-    )
 
     args = parser.parse_args()
     pid = [args.p, args.i, args.d]
@@ -759,7 +744,6 @@ if __name__ == "__main__":
         imu_mode=args.imu_mode,
         gyro_bandwidth=args.gyro_bandwidth,
         imu_thread=args.imu_thread,
-        standing_action_scale=args.standing_action_scale,
     )
     print("Done instantiating RLWalk")
     rl_walk.run()

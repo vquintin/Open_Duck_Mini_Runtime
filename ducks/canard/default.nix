@@ -67,8 +67,8 @@
     # On trial 2026-10-28: canard_walk_12 rocked standing still at 1.6-1.75
     # Hz (its balance loop too strong for the real body, the trunk lagging
     # the ankles ~110 ms more than in sim), calm at an action scale of 0.15
-    # standing still (0.25 walking). The fallback, with
-    # standingActionScale = 0.15:
+    # standing still (0.25 walking; the runtime's --standing_action_scale,
+    # f8c0505, removed once canard_walk_13 stood still without it):
     # onnxModelPath = ./canard_walk_12.onnx;
     # c7, c6 trained on with the IMU 0-80 ms later, drawn per episode (as
     # canard's trunk lags), then its torque stage (Open_Duck_Playground

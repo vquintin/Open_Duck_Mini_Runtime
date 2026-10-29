@@ -64,11 +64,23 @@
     # 0.014 (0.012), calm 81% (97%); forward 0.123 (0.125), turning 0.98 /
     # 0.99 (0.98 / 1.07); leg torque rms 1.14 N.m (1.03): watch the servos'
     # heat.
-    onnxModelPath = ./canard_walk_12.onnx;
     # On trial 2026-10-28: canard_walk_12 rocked standing still at 1.6-1.75
     # Hz (its balance loop too strong for the real body, the trunk lagging
-    # the ankles ~110 ms more than in sim); 0.25 walking.
-    standingActionScale = 0.15;
+    # the ankles ~110 ms more than in sim), calm at an action scale of 0.15
+    # standing still (0.25 walking). The fallback, with
+    # standingActionScale = 0.15:
+    # onnxModelPath = ./canard_walk_12.onnx;
+    # c7, c6 trained on with the IMU 0-80 ms later, drawn per episode (as
+    # canard's trunk lags), then its torque stage (Open_Duck_Playground
+    # 322207a, S8 at 41.3M). In c4's sim, 3x the curriculum's episodes,
+    # walk_12's then run31's in brackets: sharp stops with the IMU 60 ms
+    # late, rocking 0% (75%, 82%), falls 2.9% (13%, 36%); sharp stops 2/729
+    # falls, tipping back 2.5 deg median (3.3, 7.0); reversals 0/374 (0,
+    # 13); standing jitter of those up 0.0031 (0.0033, 0.0056); real terrain
+    # 37/540 (24, 33), all terrain 58/540 (50, 69), real-terrain speed 0.073
+    # (0.073, 0.098); forward 0.118 (0.123, 0.125); leg torque rms 1.12 N.m
+    # (1.14, 1.03). On trial at the full action scale standing still:
+    onnxModelPath = ./canard_walk_13.onnx;
     # A little ahead of the other processes; the kernel's work (USB serial,
     # I2C, Wi-Fi) at nice 0 or higher priority still served. Its steps were
     # already regular (0.08% over 25 ms in 11 min, 2026-10-28).

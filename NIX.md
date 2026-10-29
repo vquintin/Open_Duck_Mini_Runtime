@@ -213,7 +213,8 @@ nix eval --raw .#colmenaHive.nodes.canard.config.system.build.toplevel
 # -> identical store paths
 ```
 
-Nodes deploy over SSH to `<name>.local` as the duck's `duck.user` (`canard` unless set), which is in
+Nodes deploy over SSH to the duck's `duck.deployHost` (`<name>.local` unless
+set; canard's is its Tailscale name, `canard.tail43e490.ts.net`) as the duck's `duck.user` (`canard` unless set), which is in
 `wheel` with passwordless sudo on the image. Useful flags: `--on @duck` (all
 ducks, by tag), `build` / `push` instead of `apply` to stage without
 switching, and `--keep-result`.

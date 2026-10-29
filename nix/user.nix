@@ -15,6 +15,17 @@
     '';
   };
 
+  options.duck.deployHost = lib.mkOption {
+    type = lib.types.str;
+    default = "${config.networking.hostName}.local";
+    defaultText = lib.literalExpression ''"''${config.networking.hostName}.local"'';
+    example = "canard.tail43e490.ts.net";
+    description = ''
+      Address colmena deploys to over SSH: mDNS by default, or the duck's
+      Tailscale name once it has joined the tailnet.
+    '';
+  };
+
   config.users.users.${config.duck.user} = {
     isNormalUser = true;
     extraGroups = [ "wheel" "dialout" "i2c" "gpio" "audio" "video" "input" "netdev" "plugdev" ];

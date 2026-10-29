@@ -3,6 +3,8 @@
 { lib, pkgs, ... }:
 {
   networking.hostName = "canard";
+  # Deployed over Tailscale, wherever it is.
+  duck.deployHost = "canard.tail43e490.ts.net";
 
   # Wi-Fi networks, most preferred first; each one's passphrase goes in
   # wireless.env on the firmware partition, as psk_<ssid> (see nix/wifi.nix).

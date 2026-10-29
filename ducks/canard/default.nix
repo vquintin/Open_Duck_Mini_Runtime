@@ -80,7 +80,9 @@
     # 37/540 (24, 33), all terrain 58/540 (50, 69), real-terrain speed 0.073
     # (0.073, 0.098); forward 0.118 (0.123, 0.125); leg torque rms 1.12 N.m
     # (1.14, 1.03). On trial at the full action scale standing still:
-    onnxModelPath = ./canard_walk_13.onnx;
+    # onnxModelPath = ./canard_walk_13.onnx;
+    # Back to run31 (canard_walk_9, above) on 2026-10-29:
+    onnxModelPath = ./canard_walk_9.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

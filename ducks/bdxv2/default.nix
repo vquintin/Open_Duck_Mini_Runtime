@@ -29,6 +29,17 @@
   ];
 
   services.open-duck.walk = {
+    # canard_walk_13 trained on in bdxv2's body (Open_Duck_Playground
+    # a0ce97a, robots/bdxv2.toml: 2.130 kg, canard's bought parts, its prints
+    # guessed x0.641, a camera and antenna servos in the head; B1 at 6.9M).
+    # In its sim, 3x the curriculum's episodes, walk_13's in brackets: real
+    # terrain 30/540 (42), all terrain 48/540 (72); sharp stops 2.4% falls,
+    # 11% with the IMU 60 ms late (14%), no rocking; reversals 0%; standing
+    # jitter 0.004; forward 0.112, sideways asymmetry 0.10 (0.14); leg torque
+    # rms 1.06 N.m. Untried on the real duck: soft stops first, someone ready
+    # to catch it. Without it, the module's default (upstream BEST_WALK_ONNX_2):
+    onnxModelPath = ./bdxv2_walk_1.onnx;
+
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.
     servoBoard = {
@@ -45,8 +56,7 @@
     # every axis, which offsets can't correct (|a| = 9.63 at rest). Joint
     # offsets are not calibrated yet (find_soft_offsets).
     # The image starts the walk on boot, so it starts paused (press A / Cross
-    # to start walking). onnxModelPath is the module's default, upstream
-    # BEST_WALK_ONNX_2.
+    # to start walking).
     duckConfig = lib.importJSON ./duck_config.json // { start_paused = true; };
   };
 }

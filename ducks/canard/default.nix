@@ -81,10 +81,6 @@
     # (0.073, 0.098); forward 0.118 (0.123, 0.125); leg torque rms 1.12 N.m
     # (1.14, 1.03). On trial at the full action scale standing still:
     onnxModelPath = ./canard_walk_13.onnx;
-    # A little ahead of the other processes; the kernel's work (USB serial,
-    # I2C, Wi-Fi) at nice 0 or higher priority still served. Its steps were
-    # already regular (0.08% over 25 ms in 11 min, 2026-10-28).
-    nice = -5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

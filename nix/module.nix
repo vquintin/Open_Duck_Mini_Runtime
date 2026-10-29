@@ -215,12 +215,14 @@ in
 
       nice = lib.mkOption {
         type = lib.types.nullOr (lib.types.ints.between (-20) 19);
-        default = null;
+        default = -5;
         description = ''
           The walk's nice value: a larger share of the CPU than other
-          processes', the kernel's own work still served. Not SCHED_FIFO: at
-          FIFO 20 canard's servo reads took up to 80 ms (p99, 7 ms before),
-          the kernel's USB work behind the walk's threads (2026-10-28).
+          processes', the kernel's own work (USB serial, I2C, Wi-Fi) at nice 0
+          or higher priority still served. Not SCHED_FIFO: at FIFO 20 canard's
+          servo reads took up to 80 ms (p99, 7 ms before), the kernel's USB
+          work behind the walk's threads (2026-10-28). At -5 canard's steps
+          were regular (0.08% over 25 ms in 11 min). Null leaves it at 0.
         '';
       };
 

@@ -84,7 +84,7 @@
     # (1.14, 1.03). On trial at the full action scale standing still:
     # onnxModelPath = ./canard_walk_13.onnx;
     # Back to run31 (canard_walk_9, above) on 2026-10-29:
-    onnxModelPath = ./canard_walk_9.onnx;
+    # onnxModelPath = ./canard_walk_9.onnx;
     # c13, the curriculum from scratch without stand_still, the IMU 20-40 ms
     # late from S4, then pushed every 3-6 s (Open_Duck_Playground 5f35a89, S7
     # at 26.4M; its torque stage S8 never passed, each gain in torque or
@@ -96,7 +96,8 @@
     # real-terrain speed 0.067 (0.098); standing jitter 0.009 (0.0054);
     # forward 0.118 (0.127), sideways asymmetry 2.7% (7.0%), turning 1.6%
     # (9.7%); leg torque rms 1.15 N.m (1.03): watch the servos' heat.
-    # onnxModelPath = ./canard_walk_14.onnx;
+    # On trial since 2026-11-03:
+    onnxModelPath = ./canard_walk_14.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

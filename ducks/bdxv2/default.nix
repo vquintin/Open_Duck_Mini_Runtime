@@ -29,6 +29,18 @@
   ];
 
   services.open-duck.walk = {
+    # run31 (canard_walk_9) as is, the walk canard keeps for its reflexes.
+    # Trained on in bdxv2's body (Open_Duck_Playground f2b4999,
+    # curriculum/bdxv2_run31.toml) it lost its reversals (3% -> 13-42% falls)
+    # and the full terrain (23 -> 71-98 / 180), so it isn't. In bdxv2's sim,
+    # 3x the curriculum's episodes, bdxv2_walk_1's in brackets: catch steps
+    # pushed standing still 15% (1%), p50 0.53 m/s (0.46); real terrain
+    # 24/540 (30), all terrain 73/540 (48); sharp stops 0.1% falls (2.4%),
+    # 1.2% with the IMU 60 ms late (6.5%) but 10% rocking (0); reversals 5%
+    # (0%); forward 0.127 (0.113); leg torque rms 0.99 N.m (1.06). Untried on
+    # the real duck: soft stops first, someone ready to catch it.
+    onnxModelPath = ./bdxv2_walk_2.onnx;
+
     # canard_walk_13 trained on in bdxv2's body (Open_Duck_Playground
     # a0ce97a, robots/bdxv2.toml: 2.130 kg, canard's bought parts, its prints
     # guessed x0.641, a camera and antenna servos in the head; B1 at 6.9M).
@@ -37,8 +49,9 @@
     # 11% with the IMU 60 ms late (14%), no rocking; reversals 0%; standing
     # jitter 0.004; forward 0.112, sideways asymmetry 0.10 (0.14); leg torque
     # rms 1.06 N.m. Untried on the real duck: soft stops first, someone ready
-    # to catch it. Without it, the module's default (upstream BEST_WALK_ONNX_2):
-    onnxModelPath = ./bdxv2_walk_1.onnx;
+    # to catch it. Without either, the module's default (upstream
+    # BEST_WALK_ONNX_2):
+    # onnxModelPath = ./bdxv2_walk_1.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

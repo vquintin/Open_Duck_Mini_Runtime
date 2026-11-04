@@ -96,8 +96,14 @@
     # real-terrain speed 0.067 (0.098); standing jitter 0.009 (0.0054);
     # forward 0.118 (0.127), sideways asymmetry 2.7% (7.0%), turning 1.6%
     # (9.7%); leg torque rms 1.15 N.m (1.03): watch the servos' heat.
-    # On trial since 2026-11-03:
-    onnxModelPath = ./canard_walk_14.onnx;
+    # On trial 2026-11-03: walks well but never settles standing still (gyro
+    # 0.13 rad/s median, run31 0.008; hip yaw and ankles moving at 1-2 Hz):
+    # onnxModelPath = ./canard_walk_14.onnx;
+    # c13's S8 (torques -2.5e-2) at 27.5M of its extension, from walk_14's
+    # stage: standing jitter 0.0074, leg torque rms 1.12 N.m, but reversals
+    # 39/124 falls, real terrain 16/180, all terrain 29/180. To see what the
+    # torque stage does standing still (no sharp reversals with it):
+    onnxModelPath = ./canard_walk_15.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

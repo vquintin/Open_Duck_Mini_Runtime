@@ -102,8 +102,18 @@
     # c13's S8 (torques -2.5e-2) at 27.5M of its extension, from walk_14's
     # stage: standing jitter 0.0074, leg torque rms 1.12 N.m, but reversals
     # 39/124 falls, real terrain 16/180, all terrain 29/180. To see what the
-    # torque stage does standing still (no sharp reversals with it):
-    onnxModelPath = ./canard_walk_15.onnx;
+    # torque stage does standing still (no sharp reversals with it). On trial
+    # 2026-11-04: softer than walk_14, less steady reversing:
+    # onnxModelPath = ./canard_walk_15.onnx;
+    # walk_15 trained on at S8 with a quarter of the command changes reversals
+    # (Open_Duck_Playground ec46f64, 52.8M; it passes S8's 3c3c760 gate). In
+    # sim, run31's in brackets: reversals 0/123 falls (6/119); leg torque rms
+    # 1.08 N.m (1.03); standing jitter 0.0072 (0.0054); real terrain 14/180
+    # (10) at 0.084 (0.098), all terrain 27/180 (22); pushed standing, catch
+    # steps 28% (15%), median push held 0.67 m/s (0.57), walking 0.68 (0.54);
+    # sharp stops with the IMU 20 ms late, no falls or rocking; turning
+    # asymmetry 0.4% (9.7%). On trial since 2026-11-05:
+    onnxModelPath = ./canard_walk_16.onnx;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

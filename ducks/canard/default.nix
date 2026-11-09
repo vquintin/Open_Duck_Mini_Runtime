@@ -112,8 +112,17 @@
     # (10) at 0.084 (0.098), all terrain 27/180 (22); pushed standing, catch
     # steps 28% (15%), median push held 0.67 m/s (0.57), walking 0.68 (0.54);
     # sharp stops with the IMU 20 ms late, no falls or rocking; turning
-    # asymmetry 0.4% (9.7%). On trial since 2026-11-05:
-    onnxModelPath = ./canard_walk_16.onnx;
+    # asymmetry 0.4% (9.7%). On trial since 2026-11-05, the one to go back to
+    # (headRange 0):
+    # onnxModelPath = ./canard_walk_16.onnx;
+    # walk_16 trained on with head commands over half their range
+    # (Open_Duck_Playground fe40de7, S9 at 26.4M, not yet past its gate). In
+    # sim, walk_16's in brackets: head at half range, falls 2.4% (76%), error
+    # 0.112 rad (0.136); head centred, standing jitter 0.035 (0.007), real
+    # terrain 20/180 (17), all terrain 62/180 (26). To feel the head on the
+    # right stick, on trial 2026-11-09:
+    onnxModelPath = ./canard_walk_17.onnx;
+    headRange = 0.5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
     # ttyACM number it gets after a low-battery USB drop-out.

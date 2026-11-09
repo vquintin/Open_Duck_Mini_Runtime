@@ -5,7 +5,7 @@ import pytest
 
 # pygame aborts on import off the duck; the ramp only needs the deadzone.
 sys.modules.setdefault("pygame", types.ModuleType("pygame"))
-from mini_bdx_runtime.command_ramp import CommandRamp  # noqa: E402
+from mini_bdx_runtime.command_ramp import HEAD_SLEW_RATES, CommandRamp  # noqa: E402
 
 DT = 0.02
 
@@ -57,3 +57,11 @@ def test_reset_drops_to_standing():
     run(r, (0.15, 0.1, 1.0), 50)
     r.reset()
     assert r.step((0.0, 0.0, 0.0)) == (0.0, 0.0, 0.0)
+
+
+def test_the_head_ramps_at_its_own_rate_with_no_deadzone():
+    r = CommandRamp(DT, rates=HEAD_SLEW_RATES, deadzone=(0.0,) * 4)
+    assert r.step((0.5, -0.5, 0.0, 0.0)) == pytest.approx((DT * 1.0, -DT * 1.0, 0.0, 0.0))
+    assert run(r, (0.5, -0.5, 0.0, 0.0), 40)[:2] == pytest.approx((0.5, -0.5))
+    r.reset()
+    assert r.step((0.0,) * 4) == (0.0,) * 4

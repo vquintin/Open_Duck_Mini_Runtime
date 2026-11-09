@@ -46,6 +46,7 @@ let
     "-d" (toString walk.pid.d)
     "--pitch_bias" (toString walk.pitchBias)
     "--imu_mode" walk.imu.mode
+    "--head_range" (toString walk.headRange)
   ]
   ++ lib.optionals (walk.imu.mode == "amg") [ "--gyro_bandwidth" (toString walk.imu.gyroBandwidth) ]
   ++ lib.optionals (walk.cutoffFrequency != null) [ "--cutoff_frequency" (toString walk.cutoffFrequency) ]
@@ -263,6 +264,12 @@ in
           default = 116;
           description = "Gyro low-pass bandwidth in Hz, in \"amg\" mode (mini_bdx_runtime/imu_modes.py).";
         };
+      };
+
+      headRange = lib.mkOption {
+        type = lib.types.float;
+        default = 0.0;
+        description = "Share of the head's command range the right stick reaches: the range the model trained on (S9 0.5, S10 on 1.0), or 0 for a model never trained on head commands.";
       };
 
       commands = lib.mkOption {

@@ -13,6 +13,9 @@ from mini_bdx_runtime.xbox_controller import COMMAND_DEADZONE
 
 # vx, vy m/s^2, yaw rad/s^2: 0.15 m/s to 0 in 0.5 s, 1 rad/s in 0.5 s.
 SLEW_RATES = (0.3, 0.3, 2.0)
+# neck_pitch, head_pitch, head_yaw, head_roll, rad/s: within the 0.5-2 rad/s
+# the head commands ramp at in training (S9).
+HEAD_SLEW_RATES = (1.0, 1.0, 1.0, 1.0)
 
 
 class CommandRamp:
@@ -22,9 +25,9 @@ class CommandRamp:
         self.reset()
 
     def reset(self) -> None:
-        self.value = [0.0, 0.0, 0.0]
+        self.value = [0.0] * len(self.steps)
 
-    def step(self, target) -> tuple[float, float, float]:
+    def step(self, target) -> tuple[float, ...]:
         for i, (goal, step, dz) in enumerate(zip(target, self.steps, self.deadzone)):
             v = self.value[i]
             if v == 0.0 and goal != 0.0:

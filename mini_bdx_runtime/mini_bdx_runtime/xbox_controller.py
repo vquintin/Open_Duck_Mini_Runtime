@@ -20,6 +20,12 @@ HEAD_PITCH_RANGE = [-0.78, 0.3]
 HEAD_YAW_RANGE = [-0.5, 0.5]
 HEAD_ROLL_RANGE = [-0.5, 0.5]
 
+# The head commands the policy trains on, rad (neck_pitch, head_pitch, head_yaw:
+# Open_Duck_Playground's robots/canard.toml [commands]).
+NECK_PITCH_COMMAND = (-0.34, 1.1)
+HEAD_PITCH_COMMAND = (-0.78, 0.78)
+HEAD_YAW_COMMAND = (-1.5, 1.5)
+
 # Raw pygame (SDL evdev backend) axis/button indices per controller family.
 # Buttons are named after their Xbox position (A = bottom face button, ...).
 LAYOUTS: dict[str, dict[str, dict[str, int]]] = {
@@ -64,6 +70,26 @@ def walk_command(l_y: float, l_x: float, r_x: float) -> tuple[float, float, floa
     return tuple(cmd)
 
 
+def trigger_yaw(left_trigger: float, right_trigger: float) -> float:
+    """L2 turns left, R2 right: the body's yaw input to walk_command, -1..1."""
+    return float(left_trigger) - float(right_trigger)
+
+
+def head_command(r_y: float, r_x: float, head_range: float) -> tuple[float, float, float, float]:
+    """Right stick (deadzoned, -1..1, up and left positive) to (neck_pitch,
+    head_pitch, head_yaw, head_roll) rad. Pitch moves the neck and the head
+    together, reaching both stops at a full push. head_range scales it to the
+    share of the range the model trained on; 0 keeps the head still."""
+    neck_lo, neck_hi = NECK_PITCH_COMMAND
+    pitch_lo, pitch_hi = HEAD_PITCH_COMMAND
+    yaw_lo, yaw_hi = HEAD_YAW_COMMAND
+    up = r_y >= 0
+    neck = abs(r_y) * (neck_hi if up else neck_lo)
+    pitch = abs(r_y) * (pitch_hi if up else pitch_lo)
+    yaw = abs(r_x) * (yaw_hi if r_x >= 0 else yaw_lo)
+    return (neck * head_range, pitch * head_range, yaw * head_range, 0.0)
+
+
 def detect_layout(joystick_name: str) -> str:
     name = joystick_name.lower()
     # "Xbox Wireless Controller" would otherwise match the PS4's bare name.
@@ -76,10 +102,10 @@ def detect_layout(joystick_name: str) -> str:
 
 
 class XBoxController:
-    def __init__(self, command_freq: float, only_head_control: bool = False) -> None:
+    def __init__(self, command_freq: float, only_head_control: bool = False, head_range: float = 0.0) -> None:
         self.command_freq = command_freq
-        self.head_control_mode = only_head_control
         self.only_head_control = only_head_control
+        self.head_range = head_range
 
         self.last_commands = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.last_left_trigger = 0.0
@@ -178,6 +204,7 @@ class XBoxController:
         l_x = -stick(self.p1.get_axis(axes["lx"]))
         l_y = -stick(self.p1.get_axis(axes["ly"]))
         r_x = -stick(self.p1.get_axis(axes["rx"]))
+        r_y = -stick(self.p1.get_axis(axes["ry"]))
 
         right_trigger = np.around((self.p1.get_axis(axes["rt"]) + 1) / 2, ROUND_DECIMALS)
         left_trigger = np.around((self.p1.get_axis(axes["lt"]) + 1) / 2, ROUND_DECIMALS)
@@ -187,8 +214,15 @@ class XBoxController:
         if right_trigger < TRIGGER_DEADZONE:
             right_trigger = 0
 
-        if not self.head_control_mode:
-            last_commands[0:3] = walk_command(l_y, l_x, r_x)
+        if not self.only_head_control:
+            # Triangle held hands the triggers to the antennas.
+            antennas = self.p1.get_button(buttons["Y"])
+            yaw = 0.0 if antennas else trigger_yaw(left_trigger, right_trigger)
+            last_commands[0:3] = walk_command(l_y, l_x, yaw)
+            last_commands[3:7] = head_command(r_y, r_x, self.head_range)
+            if not antennas:
+                left_trigger = 0
+                right_trigger = 0
         else:
             last_commands[0] = 0.0
             last_commands[1] = 0.0
@@ -232,8 +266,6 @@ class XBoxController:
 
                 if self.p1.get_button(buttons["Y"]):
                     self.Y_pressed = True
-                    if not self.only_head_control:
-                        self.head_control_mode = not self.head_control_mode
 
                 if self.p1.get_button(buttons["LB"]):
                     self.LB_pressed = True

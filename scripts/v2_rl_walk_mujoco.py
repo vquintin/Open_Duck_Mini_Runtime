@@ -10,7 +10,7 @@ sys.modules["pkg_resources"] = None
 
 import numpy as np
 from mini_bdx_runtime.antennas import Antennas
-from mini_bdx_runtime.command_ramp import CommandRamp
+from mini_bdx_runtime.command_ramp import HEAD_SLEW_RATES, CommandRamp
 from mini_bdx_runtime.duck_config import DuckConfig
 from mini_bdx_runtime.eyes import Eyes
 from mini_bdx_runtime.feet_contacts import FeetContacts
@@ -116,6 +116,7 @@ class RLWalk:
         imu_mode: str = "ndof",
         gyro_bandwidth: float | None = None,
         imu_thread: bool = False,
+        head_range: float = 0.0,
     ) -> None:
         self.duck_config = DuckConfig(config_json_path=duck_config_path)
 
@@ -204,6 +205,8 @@ class RLWalk:
         self.last_commands = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         # The sticks' walk command, slewed: a sharp stop tipped canard back.
         self.command_ramp = CommandRamp(1 / self.control_freq)
+        self.head_ramp = CommandRamp(1 / self.control_freq, rates=HEAD_SLEW_RATES, deadzone=(0.0,) * 4)
+        self.head_range = head_range
 
         self.paused = self.duck_config.start_paused
 
@@ -217,7 +220,7 @@ class RLWalk:
 
         self.command_freq = COMMAND_FREQ
         if self.commands:
-            self.xbox_controller = XBoxController(self.command_freq)
+            self.xbox_controller = XBoxController(self.command_freq, head_range=self.head_range)
 
         # Reference motion, but we only really need the length of one phase
         # TODO
@@ -456,6 +459,7 @@ class RLWalk:
                     )
                     self.last_commands = list(self.last_commands)
                     self.last_commands[0:3] = self.command_ramp.step(self.last_commands[0:3])
+                    self.last_commands[3:7] = self.head_ramp.step(self.last_commands[3:7])
                     if self.buttons.dpad_up.triggered:
                         self.phase_frequency_factor_offset += PHASE_FREQ_OFFSET_STEP
                         offset = round(self.phase_frequency_factor_offset, 3)
@@ -481,7 +485,7 @@ class RLWalk:
                         self.antennas.set_position_left(right_trigger)
                         self.antennas.set_position_right(left_trigger)
 
-                    # RB (R1): Y already toggles the sticks to head control.
+                    # RB (R1): marks the telemetry.
                     if self.buttons.RB.triggered and self.telemetry is not None:
                         self.markers += 1
                         mark_next_step = True
@@ -498,6 +502,7 @@ class RLWalk:
                     time.sleep(PAUSE_POLL_S)
                     self.reset_stats()
                     self.command_ramp.reset()
+                    self.head_ramp.reset()
                     # Nothing reads the servos while paused.
                     self.last_servo_read_t = time.time()
                     continue
@@ -561,6 +566,10 @@ class RLWalk:
                     if time.time() - start_t > FILTER_WARMUP_S:
                         self.motor_targets = filtered_motor_targets
 
+                # Before the limits, as in training: the observed motor_targets
+                # holds the head command, and its steps are speed limited.
+                self.motor_targets[HEAD_JOINT_SLICE] += self.last_commands[3:]
+
                 self.stats_max_action = np.maximum(self.stats_max_action, np.abs(action))
                 self.stats_max_offset = np.maximum(
                     self.stats_max_offset, np.abs(self.motor_targets - self.init_pos)
@@ -580,9 +589,6 @@ class RLWalk:
                 self.motor_targets = limited
 
                 self.prev_motor_targets = self.motor_targets.copy()
-
-                head_motor_targets = self.last_commands[3:] + self.motor_targets[HEAD_JOINT_SLICE]
-                self.motor_targets[HEAD_JOINT_SLICE] = head_motor_targets
 
                 action_dict = make_action_dict(
                     self.motor_targets, list(self.hwi.joints.keys())
@@ -721,6 +727,13 @@ if __name__ == "__main__":
         help="take the IMU worker's latest sample (up to a step old) instead of reading it each step",
     )
 
+    parser.add_argument(
+        "--head_range",
+        type=float,
+        default=0.0,
+        help="share of the head's command range the right stick reaches; 0 for a model never trained on head commands",
+    )
+
     args = parser.parse_args()
     pid = [args.p, args.i, args.d]
 
@@ -744,6 +757,7 @@ if __name__ == "__main__":
         imu_mode=args.imu_mode,
         gyro_bandwidth=args.gyro_bandwidth,
         imu_thread=args.imu_thread,
+        head_range=args.head_range,
     )
     print("Done instantiating RLWalk")
     rl_walk.run()

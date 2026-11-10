@@ -129,7 +129,16 @@
     # centred, standing jitter 0.026 (0.035), real terrain 11/180 (20), all
     # terrain 21/180 (62), reversals 0/125 falls, sidesteps 0.066 / 0.063
     # m/s. Full head range falls 38%: kept at half. On trial 2026-11-10:
-    onnxModelPath = ./canard_walk_18.onnx;
+    # onnxModelPath = ./canard_walk_18.onnx;
+    # walk_18 trained on at S10, the head's full range, faster and sudden
+    # (Open_Duck_Playground df54a57, cur_head6 at 60.3M, not yet past its
+    # gate). In sim, walk_18's in brackets: full head range error 0.068 rad
+    # (0.085), falls 8.0% (38%); half range 0.057 (0.077), falls 1.6% (10%);
+    # standing jitter 0.014 (0.026); walking at half commands 0.025 m/s
+    # (0.066), at full 0.105 (0.122); real terrain 14/180 (11), all 29/180
+    # (21). Kept at half range until the head's bounds reach its joint stops
+    # and head_puppet clears the combined stops. On trial 2026-11-10:
+    onnxModelPath = ./canard_walk_19.onnx;
     headRange = 0.5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever

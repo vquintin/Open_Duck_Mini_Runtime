@@ -121,7 +121,15 @@
     # 0.112 rad (0.136); head centred, standing jitter 0.035 (0.007), real
     # terrain 20/180 (17), all terrain 62/180 (26). To feel the head on the
     # right stick, on trial 2026-11-09:
-    onnxModelPath = ./canard_walk_17.onnx;
+    # onnxModelPath = ./canard_walk_17.onnx;
+    # walk_17 trained on at S9 for 105M more (Open_Duck_Playground a66994e,
+    # head tracking sigma 0.03; cur_head5's S9 at 52.8M, 131M of S9 in all).
+    # In sim, walk_17's in brackets: head at half range, error 0.077 rad
+    # (0.112), falls 10.4% (2.4%), walking at half commands 0.066 m/s; head
+    # centred, standing jitter 0.026 (0.035), real terrain 11/180 (20), all
+    # terrain 21/180 (62), reversals 0/125 falls, sidesteps 0.066 / 0.063
+    # m/s. Full head range falls 38%: kept at half. On trial 2026-11-10:
+    onnxModelPath = ./canard_walk_18.onnx;
     headRange = 0.5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever

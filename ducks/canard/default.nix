@@ -138,7 +138,11 @@
     # (0.066), at full 0.105 (0.122); real terrain 14/180 (11), all 29/180
     # (21). Kept at half range until the head's bounds reach its joint stops
     # and head_puppet clears the combined stops. On trial 2026-11-10:
-    onnxModelPath = ./canard_walk_19.onnx;
+    # onnxModelPath = ./canard_walk_19.onnx;
+    # S10's extension (cur_head6's S10_head_full_ext1 at 27.5M, restarted
+    # from its S10 at 30.1M, 57.7M of S10 in all), taken before its
+    # evaluation came. On trial 2026-11-10:
+    onnxModelPath = ./canard_walk_20.onnx;
     headRange = 0.5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever

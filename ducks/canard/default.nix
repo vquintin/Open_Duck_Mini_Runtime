@@ -142,7 +142,16 @@
     # S10's extension (cur_head6's S10_head_full_ext1 at 27.5M, restarted
     # from its S10 at 30.1M, 57.7M of S10 in all), taken before its
     # evaluation came. On trial 2026-11-10:
-    onnxModelPath = ./canard_walk_20.onnx;
+    # onnxModelPath = ./canard_walk_20.onnx;
+    # walk_19's line through S11 (head roll level, 26.4M) and S12 (action
+    # rate cost doubled, 60.3M), ungated, head tracking 0.75 (Open_Duck_
+    # Playground 36b1842, cur_head8's final.onnx). In sim, walk_19's in
+    # brackets: standing jitter 0.0115 (0.014); half commands 0.086 m/s
+    # (0.025); head moving 0.089 (0.072); real terrain 7/180 (14), all
+    # 20/180 (29); full head range error 0.069 rad (0.068), falls 14% (8%);
+    # head roll off the ground 2.8x the trunk's; sidesteps 0.056 / 0.057
+    # (0.064 / 0.066). On trial 2026-11-11:
+    onnxModelPath = ./canard_walk_21.onnx;
     headRange = 0.5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever

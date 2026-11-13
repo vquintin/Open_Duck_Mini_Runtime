@@ -151,7 +151,16 @@
     # 20/180 (29); full head range error 0.069 rad (0.068), falls 14% (8%);
     # head roll off the ground 2.8x the trunk's; sidesteps 0.056 / 0.057
     # (0.064 / 0.066). On trial 2026-11-11:
-    onnxModelPath = ./canard_walk_21.onnx;
+    # onnxModelPath = ./canard_walk_21.onnx;
+    # canard_head from scratch, the head on commands from S0 (Open_Duck_
+    # Playground 62b5462, cur_hd2: S5's real terrain gate 18, S6-S9's 20;
+    # S9 ungated from S8 at 52.8M, its final 105.5M). In sim, walk_21's in
+    # brackets: standing jitter 0.0157 (0.0115); half commands 0.061 m/s
+    # (0.086); head moving 0.103 (0.089); real terrain 15/180 (7), all 22/180
+    # (20); full head range error 0.069 rad (0.069), falls 0.8% ramped (0%);
+    # head roll off the ground 3.75x the trunk's (2.8); sidesteps 0.072 /
+    # 0.070 (0.056 / 0.057); stops and reversals 0% falls. On trial 2026-11-13:
+    onnxModelPath = ./canard_walk_22.onnx;
     headRange = 0.5;
 
     # Waveshare bus servo adapter (CH343), reachable as /dev/servohat whatever
